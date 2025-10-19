@@ -36,6 +36,9 @@ import threading
 import time
 from optparse import OptionParser
 
+# Disable creation of __pycache__/.pyc files from rules.py files
+sys.dont_write_bytecode = True
+
 visited = set()
 enqueued = set()
 completed = set()
