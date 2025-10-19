@@ -86,10 +86,10 @@ def normpath(path):
 
 if os.name == 'nt': # evaluate this condition only once, rather than per call, for performance
     def joinpath(cwd, path):
-        return path if (path[0] == '/' or path[1] == ':') else '%s/%s' % (cwd, path)
+        return path if (path[0] == '/' or path[1] == ':') else f'{cwd}/{path}'
 else:
     def joinpath(cwd, path):
-        return path if path[0] == '/' else '%s/%s' % (cwd, path)
+        return path if path[0] == '/' else f'{cwd}/{path}'
 
 def run_cmd(rule, options):
     # Always delete the targets first
@@ -133,9 +133,9 @@ def run_cmd(rule, options):
             with io_lock:
                 with open(rule.d_file, 'wt') as f:
                     assert len(rule.targets) == 1
-                    f.write('%s: \\\n' % rule.targets[0])
+                    f.write(f'{rule.targets[0]}: \\\n')
                     for dep in sorted(deps):
-                        f.write('  %s \\\n' % dep)
+                        f.write(f'  {dep} \\\n')
                     f.write('\n')
 
             # In addition to filtering out the /showIncludes messages, filter the one remaining
@@ -214,7 +214,7 @@ class BuildContext:
         rule = Rule(targets, deps, cwd, cmds, d_file, order_only_deps, msvc_show_includes, stdout_filter, latency)
         for t in targets:
             if t in rules:
-                print("ERROR: multiple ways to build target '%s'" % t)
+                print(f'ERROR: multiple ways to build target {t!r}')
                 exit(1)
             rules[t] = rule
 
@@ -305,8 +305,8 @@ def parse_rules_py(ctx, options, pathname, visited):
         return
     visited.add(pathname)
     if options.verbose:
-        print("Parsing '%s'..." % pathname)
-    spec = importlib.util.spec_from_file_location('rules%d' % len(visited), pathname)
+        print(f'Parsing {pathname!r}...')
+    spec = importlib.util.spec_from_file_location(f'rules{len(visited)}', pathname)
     if spec is None:
         raise ImportError(f'Cannot create spec for {pathname!r}')
     rules_py_module = importlib.util.module_from_spec(spec)
@@ -317,7 +317,7 @@ def parse_rules_py(ctx, options, pathname, visited):
     dir = os.path.dirname(pathname)
     if dir not in make_db:
         make_db[dir] = {}
-        path = '%s/_out/make.db' % dir
+        path = f'{dir}/_out/make.db'
         if os.path.exists(path):
             with open(path) as f:
                 for line in f:
@@ -394,22 +394,22 @@ def main():
         parse_rules_py(ctx, options, normpath(joinpath(cwd, f)), visited)
     for target in args:
         if target not in rules:
-            print("ERROR: no rule to build target '%s'" % target)
+            print(f'ERROR: no rule to build target {target!r}')
             exit(1)
         propagate_latencies(target, 0)
 
     # Clean up stale targets from previous builds that no longer have rules; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
         if options.clean:
-            dir = '%s/_out' % cwd
+            dir = f'{cwd}/_out'
             if os.path.exists(dir):
-                stdout_write("Cleaning '%s'...\n" % dir)
+                stdout_write(f'Cleaning {dir!r}...\n')
                 shutil.rmtree(dir)
             db.clear()
         for (target, signature) in list(db.items()):
             if target not in rules:
                 if os.path.exists(target):
-                    print("Deleting stale target '%s'..." % target)
+                    print(f'Deleting stale target {target!r}...')
                     os.unlink(target)
                 del db[target]
 
@@ -439,7 +439,7 @@ def main():
                     incomplete_count = sum(1 for x in (visited - completed) if x in rules)
                     if incomplete_count:
                         progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in set(building)))
-                        progress = 'make.py: %d left, building: %s' % (incomplete_count, progress)
+                        progress = f'make.py: {incomplete_count} left, building: {progress}'
                     else:
                         progress = ''
                     if len(progress) < usable_columns:
@@ -448,7 +448,7 @@ def main():
                         progress += '\b' * pad # put cursor back at end of line
                     else:
                         progress = progress[0:usable_columns]
-                    stdout_write('\r%s' % progress)
+                    stdout_write('\r' + progress)
                 if all(target in completed for target in args):
                     break
                 time.sleep(0.1)
@@ -467,11 +467,11 @@ def main():
         # XXX May want to do this "occasionally" as the build is running?  (not too often to avoid a perf hit, but often
         # enough to avoid data loss)
         for (cwd, db) in make_db.items():
-            if not os.path.exists('%s/_out' % cwd):
-                os.mkdir('%s/_out' % cwd)
-            with open('%s/_out/make.db' % cwd, 'w') as f:
+            if not os.path.exists(f'{cwd}/_out'):
+                os.mkdir(f'{cwd}/_out')
+            with open(f'{cwd}/_out/make.db', 'w') as f:
                 for (target, signature) in db.items():
-                    f.write('%s %s\n' % (target, signature))
+                    f.write(f'{target} {signature}\n')
 
     if any_errors:
         exit(1)
