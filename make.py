@@ -308,10 +308,10 @@ def parse_rules_py(ctx, options, pathname, visited):
         print("Parsing '%s'..." % pathname)
     spec = importlib.util.spec_from_file_location('rules%d' % len(visited), pathname)
     if spec is None:
-        raise ImportError(f'Cannot create spec for {pathname}')
+        raise ImportError(f'Cannot create spec for {pathname!r}')
     rules_py_module = importlib.util.module_from_spec(spec)
     if spec.loader is None:
-        raise ImportError(f'Cannot get loader for {pathname}')
+        raise ImportError(f'Cannot get loader for {pathname!r}')
     spec.loader.exec_module(rules_py_module)
 
     dir = os.path.dirname(pathname)
