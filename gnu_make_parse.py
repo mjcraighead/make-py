@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 #
-# make.py (http://code.google.com/p/make-py/)
-# $Revision: 52 $
-# Copyright (c) 2014 Matt Craighead
+# make.py (https://github.com/mjcraighead/make-py)
+# Copyright (c) 2014-2025 Matt Craighead
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
 # associated documentation files (the "Software"), to deal in the Software without restriction,
@@ -21,6 +20,10 @@
 
 # This is a work-in-progress helper script for parsing GNU makefiles.  This can be useful sometimes
 # when you need to convert existing makefiles into rules.py files.
+#
+# Practically, in 2025, you will get far better results using an LLM (ChatGPT, etc.) to translate
+# Makefiles into rules.py files.  This helper script was an early experiment and will be removed
+# from the repository in the future.
 
 import argparse
 import glob
