@@ -29,4 +29,4 @@ make.py intends to be fast, powerful, reliable, and yet minimalistic:
 Planned features that are not supported yet:
 * Using SHA1 hashes instead of timestamps to determine when rebuilds are necessary.
 
-make.py requires Python 3.1 or newer.
+make.py requires Python 3.6 or newer.
