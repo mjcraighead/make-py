@@ -74,4 +74,5 @@ When your build tool fits in a single file, debugging and trust become much easi
 
 ## 📜 License
 MIT License
+
 Copyright © 2012-2025 Matt Craighead
