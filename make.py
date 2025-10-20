@@ -18,6 +18,7 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
 # OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import ast
 import errno
 import hashlib
 import importlib.util
@@ -300,18 +301,40 @@ class BuilderThread(threading.Thread):
             building.difference_update(rule.targets)
             completed.update(rule.targets)
 
+# Reject disallowed constructs in rules.py
+def validate_rules_ast(tree, path):
+    BANNED = (
+        ast.While,
+        ast.ImportFrom, # XXX ast.Import temporarily allowed here as a transitional aid for now
+        ast.With, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith,
+        ast.Global, ast.Nonlocal, ast.Lambda, ast.NamedExpr, ast.ClassDef,
+        ast.Try, ast.Raise, ast.Yield, ast.YieldFrom, ast.Await,
+        ast.Delete,
+    )
+
+    for node in ast.walk(tree):
+        lineno = getattr(node, 'lineno', '?')
+        if isinstance(node, BANNED):
+            raise SyntaxError(f'{type(node).__name__} not allowed in rules.py (file {path!r}, line {lineno})')
+        if isinstance(node, ast.Constant) and isinstance(node.value, (float, complex)):
+            raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
+
 def parse_rules_py(ctx, options, pathname, visited):
     if pathname in visited:
         return
     visited.add(pathname)
     if options.verbose:
         print(f'Parsing {pathname!r}...')
+
+    with open(pathname, 'r', encoding='utf-8') as f:
+        source = f.read()
+    tree = ast.parse(source, filename=pathname)
+    validate_rules_ast(tree, pathname)
+
     spec = importlib.util.spec_from_file_location(f'rules{len(visited)}', pathname)
-    if spec is None:
-        raise ImportError(f'Cannot create spec for {pathname!r}')
+    if spec is None or spec.loader is None:
+        raise ImportError(f'Cannot import {pathname!r}')
     rules_py_module = importlib.util.module_from_spec(spec)
-    if spec.loader is None:
-        raise ImportError(f'Cannot get loader for {pathname!r}')
     spec.loader.exec_module(rules_py_module)
 
     dir = os.path.dirname(pathname)

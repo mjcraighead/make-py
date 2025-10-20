@@ -24,7 +24,7 @@ make.py intends to be fast, powerful, reliable, and yet minimalistic:
 * Supports order-only dependencies (essential for auto-generated header files).
 * Supports multi-target rules (a single command that generates multiple output files simultaneously).
 * Takes care of a minor annoyance: automatically creates the directories that output files will live in, if they don't already exist.
-* The entire tool is a single source file, make.py, that is about 450 lines of code.
+* The entire tool is a single source file, make.py, that is about 500 lines of code.
 
 Planned features that are not supported yet:
 * Using SHA1 hashes instead of timestamps to determine when rebuilds are necessary.
