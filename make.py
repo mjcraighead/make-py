@@ -173,12 +173,12 @@ def run_cmd(rule, options):
         stdout_write(built_text)
 
 class Rule:
-    def __init__(self, targets, deps, cwd, cmd, d_file, order_only_inputs, msvc_show_includes, output_exclude, latency):
+    def __init__(self, targets, deps, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency):
         self.targets = targets
         self.deps = deps
         self.cwd = cwd
         self.cmd = cmd
-        self.d_file = d_file
+        self.d_file = depfile
         self.order_only_inputs = order_only_inputs
         self.msvc_show_includes = msvc_show_includes
         self.output_exclude = output_exclude
@@ -191,7 +191,7 @@ class Rule:
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
-    def rule(self, outputs, inputs, *, cmd=None, d_file=None, order_only_inputs=[], msvc_show_includes=False, output_exclude=None, latency=1):
+    def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=[], msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
         if not isinstance(outputs, list):
             assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
@@ -202,14 +202,14 @@ class BuildContext:
             inputs = [inputs]
         assert isinstance(cmd, list), cmd # cmd is intended to be an argv list
         assert all(isinstance(x, str) for x in cmd), cmd
-        if d_file is not None:
-            assert isinstance(d_file, str) # we expect d_file to be ether None or a str (the path of the .d file)
-            d_file = normpath(joinpath(cwd, d_file))
+        if depfile is not None:
+            assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the .d file)
+            depfile = normpath(joinpath(cwd, depfile))
         assert isinstance(order_only_inputs, list)
         order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
         assert output_exclude is None or isinstance(output_exclude, str)
 
-        rule = Rule(outputs, inputs, cwd, cmd, d_file, order_only_inputs, msvc_show_includes, output_exclude, latency)
+        rule = Rule(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for t in outputs:
             if t in rules:
                 print(f'ERROR: multiple ways to build output {t!r}')
