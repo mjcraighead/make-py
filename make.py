@@ -427,13 +427,11 @@ def main():
                 del db[target]
 
     if args.parallel:
-        # Create builder threads
-        threads = []
-        for i in range(args.jobs):
-            t = BuilderThread(args)
+        # Create and start builder threads
+        threads = [BuilderThread(args) for i in range(args.jobs)]
+        for t in threads:
             t.daemon = True
             t.start()
-            threads.append(t)
 
     # Do the build, and try to shut down as cleanly as possible if we get a Ctrl-C
     try:
