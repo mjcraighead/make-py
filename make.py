@@ -192,14 +192,23 @@ class BuildContext:
         if not isinstance(outputs, list):
             assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
             outputs = [outputs]
+        if cmd is None: # phony rule -- no command -- XXX do we want to support phony rules with commands?
+            assert all(o.startswith(':') for o in outputs), outputs # phony rule targets must start with :
+            assert depfile is None, depfile # phony rules cannot have depfiles
+            assert order_only_inputs is None, order_only_inputs # phony rules cannot have order_only_inputs
+            assert msvc_show_includes == False, msvc_show_includes # phony rules cannot set msvc_show_includes
+            assert output_exclude is None, output_exclude # phony rules cannot set output_exclude
+            # XXX override latency = 0?
+        else: # real rule -- has a command
+            assert all(o.startswith('_out/') for o in outputs), outputs # real rule targets must start with _out/
+            assert isinstance(cmd, list), cmd # real rules must have a command, which is an argv list
+            assert all(isinstance(x, str) for x in cmd), cmd
+            cmd = cmd.copy()
         outputs = [normpath(joinpath(cwd, x)) for x in outputs]
         if not isinstance(inputs, list):
             assert isinstance(inputs, str) # we expect inputs to be either a str (a single input) or a list of inputs
             inputs = [inputs]
         inputs = inputs.copy()
-        assert isinstance(cmd, list), cmd # cmd is intended to be an argv list
-        assert all(isinstance(x, str) for x in cmd), cmd
-        cmd = cmd.copy()
         if depfile is not None:
             assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the depfile)
             depfile = normpath(joinpath(cwd, depfile))
@@ -280,7 +289,8 @@ def build(target, args):
         enqueued.update(rule.targets)
     else:
         # Build the target immediately
-        run_cmd(rule, args)
+        if rule.cmd is not None:
+            run_cmd(rule, args)
         completed.update(rule.targets)
 
 class BuilderThread(threading.Thread):
@@ -293,9 +303,10 @@ class BuilderThread(threading.Thread):
             (priority, counter, rule) = task_queue.get()
             if rule is None:
                 break
-            building.update(rule.targets)
-            run_cmd(rule, self.args)
-            building.difference_update(rule.targets)
+            if rule.cmd is not None:
+                building.update(rule.targets)
+                run_cmd(rule, self.args)
+                building.difference_update(rule.targets)
             completed.update(rule.targets)
 
 # Reject disallowed constructs in rules.py
