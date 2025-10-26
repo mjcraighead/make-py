@@ -6,7 +6,7 @@ def rules(ctx):
         o_file = '_out/%s' % file.replace('.c', '.o')
         d_file = o_file.replace('.o', '.d')
         cmd = ['gcc', '-o', o_file, '-c', file, '-MD']
-        ctx.rule(o_file, [file], cmd, d_file=d_file)
+        ctx.rule(o_file, file, cmd, d_file=d_file)
         o_files += [o_file]
 
     exe_file = '_out/hello'

@@ -201,7 +201,9 @@ class BuildContext:
             assert isinstance(targets, str) # we expect targets to be either a str (a single target) or a list of targets
             targets = [targets]
         targets = [normpath(joinpath(cwd, x)) for x in targets]
-        assert isinstance(deps, list) # we expect deps to be a list of deps
+        if not isinstance(deps, list):
+            assert isinstance(deps, str) # we expect deps to be either a str (a single dep) or a list of deps
+            deps = [deps]
         assert isinstance(cmds, list) # cmds is intended to be a list of lists of arg strings
         if isinstance(cmds[0], str):
             cmds = [cmds] # but, we allow just a single command as a list of strings -- wrap it with another list
