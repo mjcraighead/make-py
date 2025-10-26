@@ -191,15 +191,15 @@ class Rule:
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
-    def rule(self, targets, deps, *, cmd=None, d_file=None, order_only_inputs=[], msvc_show_includes=False, output_exclude=None, latency=1):
+    def rule(self, outputs, inputs, *, cmd=None, d_file=None, order_only_inputs=[], msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
-        if not isinstance(targets, list):
-            assert isinstance(targets, str) # we expect targets to be either a str (a single target) or a list of targets
-            targets = [targets]
-        targets = [normpath(joinpath(cwd, x)) for x in targets]
-        if not isinstance(deps, list):
-            assert isinstance(deps, str) # we expect deps to be either a str (a single dep) or a list of deps
-            deps = [deps]
+        if not isinstance(outputs, list):
+            assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
+            outputs = [outputs]
+        outputs = [normpath(joinpath(cwd, x)) for x in outputs]
+        if not isinstance(inputs, list):
+            assert isinstance(inputs, str) # we expect inputs to be either a str (a single input) or a list of inputs
+            inputs = [inputs]
         assert isinstance(cmd, list), cmd # cmd is intended to be an argv list
         assert all(isinstance(x, str) for x in cmd), cmd
         if d_file is not None:
@@ -209,10 +209,10 @@ class BuildContext:
         order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
         assert output_exclude is None or isinstance(output_exclude, str)
 
-        rule = Rule(targets, deps, cwd, cmd, d_file, order_only_inputs, msvc_show_includes, output_exclude, latency)
-        for t in targets:
+        rule = Rule(outputs, inputs, cwd, cmd, d_file, order_only_inputs, msvc_show_includes, output_exclude, latency)
+        for t in outputs:
             if t in rules:
-                print(f'ERROR: multiple ways to build target {t!r}')
+                print(f'ERROR: multiple ways to build output {t!r}')
                 exit(1)
             rules[t] = rule
 
