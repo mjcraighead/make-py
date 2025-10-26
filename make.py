@@ -191,7 +191,7 @@ class Rule:
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
-    def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=[], msvc_show_includes=False, output_exclude=None, latency=1):
+    def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
         if not isinstance(outputs, list):
             assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
@@ -205,6 +205,8 @@ class BuildContext:
         if depfile is not None:
             assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the .d file)
             depfile = normpath(joinpath(cwd, depfile))
+        if order_only_inputs is None:
+            order_only_inputs = []
         assert isinstance(order_only_inputs, list)
         order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
         assert output_exclude is None or isinstance(output_exclude, str)
