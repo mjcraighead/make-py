@@ -20,6 +20,7 @@
 
 import argparse
 import ast
+import contextlib
 import hashlib
 import importlib.util
 import itertools
@@ -474,10 +475,8 @@ def main():
         # XXX May want to do this "occasionally" as the build is running?  (not too often to avoid a perf hit, but often
         # enough to avoid data loss)
         for (cwd, db) in make_db.items():
-            try:
+            with contextlib.suppress(FileExistsError):
                 os.mkdir(f'{cwd}/_out')
-            except FileExistsError:
-                pass
             with open(f'{cwd}/_out/make.db', 'w') as f:
                 for (target, signature) in db.items():
                     f.write(f'{target} {signature}\n')
