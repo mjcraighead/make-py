@@ -65,15 +65,12 @@ def stdout_write(x):
         sys.stdout.write(x)
         sys.stdout.flush()
 
-# By querying both a file's existence and its timestamp in a single syscall, we can get
-# a significant speedup, especially for network file systems.
+# Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
     try:
         return os.stat(path).st_mtime
-    except OSError as e:
-        if e.errno == errno.ENOENT:
-            return -1
-        raise
+    except FileNotFoundError:
+        return -1.0 # sentinel value: file does not exist
 
 def normpath(path):
     if path in normpath_cache:
