@@ -18,6 +18,7 @@
 # DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT
 # OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+import argparse
 import ast
 import errno
 import hashlib
@@ -34,7 +35,6 @@ import subprocess
 import sys
 import threading
 import time
-from optparse import OptionParser
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
@@ -91,7 +91,7 @@ else:
     def joinpath(cwd, path):
         return path if path[0] == '/' else f'{cwd}/{path}'
 
-def run_cmd(rule, options):
+def run_cmd(rule, args):
     # Always delete the targets first
     local_make_db = make_db[rule.cwd]
     for t in rule.targets:
@@ -148,7 +148,7 @@ def run_cmd(rule, options):
             r = re.compile(rule.output_exclude)
             out = '\n'.join(line for line in out.splitlines() if not r.match(line))
 
-        if options.verbose or code:
+        if args.verbose or code:
             if os.name == 'nt':
                 out = '%s\n%s' % (subprocess.list2cmdline(cmd), out)
             else:
@@ -220,7 +220,7 @@ class BuildContext:
                 exit(1)
             rules[t] = rule
 
-def build(target, options):
+def build(target, args):
     if target in visited or target in completed:
         return
     if target not in rules:
@@ -246,7 +246,7 @@ def build(target, options):
             d_file_deps = d_file_deps.split()[1:]
         d_file_deps = [normpath(joinpath(rule.cwd, x)) for x in d_file_deps]
     for dep in itertools.chain(deps, d_file_deps, rule.order_only_inputs):
-        build(dep, options)
+        build(dep, args)
     if any(dep not in completed for dep in itertools.chain(deps, d_file_deps, rule.order_only_inputs)):
         return
 
@@ -276,7 +276,7 @@ def build(target, options):
         if not os.path.exists(target_dir):
             os.makedirs(target_dir)
 
-    if options.parallel:
+    if args.parallel:
         # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
         global priority_queue_counter
         task_queue.put((-rule.priority, priority_queue_counter, rule))
@@ -284,13 +284,13 @@ def build(target, options):
         enqueued.update(rule.targets)
     else:
         # Build the target immediately
-        run_cmd(rule, options)
+        run_cmd(rule, args)
         completed.update(rule.targets)
 
 class BuilderThread(threading.Thread):
-    def __init__(self, options):
+    def __init__(self, args):
         threading.Thread.__init__(self)
-        self.options = options
+        self.args = args
 
     def run(self):
         while not any_errors:
@@ -298,7 +298,7 @@ class BuilderThread(threading.Thread):
             if rule is None:
                 break
             building.update(rule.targets)
-            run_cmd(rule, self.options)
+            run_cmd(rule, self.args)
             building.difference_update(rule.targets)
             completed.update(rule.targets)
 
@@ -324,11 +324,11 @@ def validate_rules_ast(tree, path):
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)):
             raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
 
-def parse_rules_py(ctx, options, pathname, visited):
+def parse_rules_py(ctx, args, pathname, visited):
     if pathname in visited:
         return
     visited.add(pathname)
-    if options.verbose:
+    if args.verbose:
         print(f'Parsing {pathname!r}...')
 
     with open(pathname, 'r', encoding='utf-8') as f:
@@ -353,7 +353,7 @@ def parse_rules_py(ctx, options, pathname, visited):
                     make_db[dir][target] = signature
     if hasattr(rules_py_module, 'submakes'):
         for f in rules_py_module.submakes():
-            parse_rules_py(ctx, options, normpath(joinpath(dir, f)), visited)
+            parse_rules_py(ctx, args, normpath(joinpath(dir, f)), visited)
     ctx.cwd = dir
     if hasattr(rules_py_module, 'rules'):
         rules_py_module.rules(ctx)
@@ -397,30 +397,32 @@ def propagate_latencies(target, latency):
 
 def main():
     # Parse command line
-    parser = OptionParser(usage='%prog [options] target1_path [target2_path ...]')
-    parser.add_option('-c', dest='clean', action='store_true', default=False, help='clean before building')
-    parser.add_option('-f', dest='files', action='append', help='specify the path to a rules.py file (default is "rules.py")', metavar='FILE')
-    parser.add_option('-j', dest='jobs', type='int', default=None, help='specify the number of parallel jobs (defaults to one per CPU)')
-    parser.add_option('-v', dest='verbose', action='store_true', help='print verbose build output')
-    parser.add_option('--no-parallel', dest='parallel', action='store_false', default=True, help='disable parallel build')
-    (options, args) = parser.parse_args()
-    if options.jobs is None:
-        options.jobs = os.cpu_count() # default to one job per CPU
-    if options.files is None:
-        options.files = ['rules.py'] # default to "-f rules.py"
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-c', '--clean', action='store_true', help='clean before building')
+    parser.add_argument('-f', '--file', dest='files', action='append', help='specify the path to a rules.py file (default is "rules.py")', metavar='FILE')
+    parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
+    parser.add_argument('-v', '--verbose', action='store_true', help='print verbose build output')
+    parser.add_argument('--no-parallel', dest='parallel', action='store_false', help='disable parallel build')
+    parser.add_argument('targets', nargs='*', help='targets to build')
+    args = parser.parse_args()
+    if args.jobs is None:
+        args.jobs = os.cpu_count() # default to one job per CPU
+    if args.files is None:
+        args.files = ['rules.py'] # default to "-f rules.py"
+
     cwd = os.getcwd()
-    args = [normpath(joinpath(cwd, x)) for x in args]
+    args.targets = [normpath(joinpath(cwd, x)) for x in args.targets]
 
     # Presumably -v should shut off the progress indicator; supporting it w/ --no-parallel seems like extra work for no gain.
     global progress_line, usable_columns
     usable_columns = get_usable_columns()
-    progress_line = usable_columns is not None and not options.verbose and options.parallel
+    progress_line = usable_columns is not None and not args.verbose and args.parallel
 
     # Set up rule DB, reading in make.db files as we go
     ctx = BuildContext()
-    for f in options.files:
-        parse_rules_py(ctx, options, normpath(joinpath(cwd, f)), visited)
-    for target in args:
+    for f in args.files:
+        parse_rules_py(ctx, args, normpath(joinpath(cwd, f)), visited)
+    for target in args.targets:
         if target not in rules:
             print(f'ERROR: no rule to build target {target!r}')
             exit(1)
@@ -428,7 +430,7 @@ def main():
 
     # Clean up stale targets from previous builds that no longer have rules; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
-        if options.clean:
+        if args.clean:
             dir = f'{cwd}/_out'
             if os.path.exists(dir):
                 stdout_write(f'Cleaning {dir!r}...\n')
@@ -441,23 +443,23 @@ def main():
                     os.unlink(target)
                 del db[target]
 
-    if options.parallel:
+    if args.parallel:
         # Create builder threads
         threads = []
-        for i in range(options.jobs):
-            t = BuilderThread(options)
+        for i in range(args.jobs):
+            t = BuilderThread(args)
             t.daemon = True
             t.start()
             threads.append(t)
 
     # Do the build, and try to shut down as cleanly as possible if we get a Ctrl-C
     try:
-        if options.parallel:
+        if args.parallel:
             # Enqueue work to the builders
             while True:
                 visited.clear()
-                for target in args:
-                    build(target, options)
+                for target in args.targets:
+                    build(target, args)
 
                 # Show progress update and exit if done, otherwise sleep to prevent burning 100% of CPU
                 # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
@@ -477,16 +479,16 @@ def main():
                     else:
                         progress = progress[0:usable_columns]
                     stdout_write('\r' + progress)
-                if all(target in completed for target in args):
+                if all(target in completed for target in args.targets):
                     break
                 time.sleep(0.1)
         else:
-            for target in args:
-                build(target, options)
+            for target in args.targets:
+                build(target, args)
     finally:
-        if options.parallel:
+        if args.parallel:
             # Shut down the system by sending sentinel tokens to all the threads
-            for i in range(options.jobs):
+            for i in range(args.jobs):
                 task_queue.put((1000000, 0, None)) # lower priority than any real rule
             for t in threads:
                 t.join()
