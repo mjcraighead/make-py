@@ -317,6 +317,10 @@ def validate_rules_ast(tree, path):
         lineno = getattr(node, 'lineno', '?')
         if isinstance(node, BANNED):
             raise SyntaxError(f'{type(node).__name__} not allowed in rules.py (file {path!r}, line {lineno})')
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name not in {'os', 'platform'}:
+                    raise SyntaxError(f'Import of {alias.name!r} not allowed (file {path!r}, line {lineno})')
         if isinstance(node, ast.Constant) and isinstance(node.value, (float, complex)):
             raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
 
