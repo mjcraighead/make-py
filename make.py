@@ -200,8 +200,10 @@ class BuildContext:
         if not isinstance(inputs, list):
             assert isinstance(inputs, str) # we expect inputs to be either a str (a single input) or a list of inputs
             inputs = [inputs]
+        inputs = inputs.copy()
         assert isinstance(cmd, list), cmd # cmd is intended to be an argv list
         assert all(isinstance(x, str) for x in cmd), cmd
+        cmd = cmd.copy()
         if depfile is not None:
             assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the .d file)
             depfile = normpath(joinpath(cwd, depfile))
