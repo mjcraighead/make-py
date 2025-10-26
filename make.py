@@ -92,7 +92,7 @@ def run_cmd(rule, args):
     # Always delete the targets first
     local_make_db = make_db[rule.cwd]
     for t in rule.targets:
-        if os.path.exists(t):
+        with contextlib.suppress(FileNotFoundError):
             os.unlink(t)
         if t in local_make_db:
             del local_make_db[t]
@@ -158,7 +158,7 @@ def run_cmd(rule, args):
             any_errors = True
             stdout_write("%s%s\n\n" % (built_text, '\n'.join(all_out)))
             for t in rule.targets:
-                if os.path.exists(t):
+                with contextlib.suppress(FileNotFoundError):
                     os.unlink(t)
             exit(1)
 
