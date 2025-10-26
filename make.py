@@ -173,25 +173,25 @@ def run_cmd(rule, options):
         stdout_write(built_text)
 
 class Rule:
-    def __init__(self, targets, deps, cwd, cmd, d_file, order_only_deps, msvc_show_includes, output_exclude, latency):
+    def __init__(self, targets, deps, cwd, cmd, d_file, order_only_inputs, msvc_show_includes, output_exclude, latency):
         self.targets = targets
         self.deps = deps
         self.cwd = cwd
         self.cmd = cmd
         self.d_file = d_file
-        self.order_only_deps = order_only_deps
+        self.order_only_inputs = order_only_inputs
         self.msvc_show_includes = msvc_show_includes
         self.output_exclude = output_exclude
         self.latency = latency
         self.priority = 0
 
-    # order_only_deps, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
+    # order_only_inputs, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
     def signature(self):
         info = (self.targets, self.deps, self.cwd, self.cmd, self.d_file, self.msvc_show_includes)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
-    def rule(self, targets, deps, *, cmd=None, d_file=None, order_only_deps=[], msvc_show_includes=False, output_exclude=None, latency=1):
+    def rule(self, targets, deps, *, cmd=None, d_file=None, order_only_inputs=[], msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
         if not isinstance(targets, list):
             assert isinstance(targets, str) # we expect targets to be either a str (a single target) or a list of targets
@@ -205,11 +205,11 @@ class BuildContext:
         if d_file is not None:
             assert isinstance(d_file, str) # we expect d_file to be ether None or a str (the path of the .d file)
             d_file = normpath(joinpath(cwd, d_file))
-        assert isinstance(order_only_deps, list)
-        order_only_deps = [normpath(joinpath(cwd, x)) for x in order_only_deps]
+        assert isinstance(order_only_inputs, list)
+        order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
         assert output_exclude is None or isinstance(output_exclude, str)
 
-        rule = Rule(targets, deps, cwd, cmd, d_file, order_only_deps, msvc_show_includes, output_exclude, latency)
+        rule = Rule(targets, deps, cwd, cmd, d_file, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for t in targets:
             if t in rules:
                 print(f'ERROR: multiple ways to build target {t!r}')
@@ -241,9 +241,9 @@ def build(target, options):
         else:
             d_file_deps = d_file_deps.split()[1:]
         d_file_deps = [normpath(joinpath(rule.cwd, x)) for x in d_file_deps]
-    for dep in itertools.chain(deps, d_file_deps, rule.order_only_deps):
+    for dep in itertools.chain(deps, d_file_deps, rule.order_only_inputs):
         build(dep, options)
-    if any(dep not in completed for dep in itertools.chain(deps, d_file_deps, rule.order_only_deps)):
+    if any(dep not in completed for dep in itertools.chain(deps, d_file_deps, rule.order_only_inputs)):
         return
 
     # Don't build if already up to date
@@ -388,7 +388,7 @@ def propagate_latencies(target, latency):
 
     # Recursively handle the dependencies, including order-only deps
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
-    for dep in itertools.chain(deps, rule.order_only_deps):
+    for dep in itertools.chain(deps, rule.order_only_inputs):
         propagate_latencies(dep, latency)
 
 def main():
