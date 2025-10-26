@@ -216,7 +216,7 @@ class BuildContext:
         rule = Rule(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for t in outputs:
             if t in rules:
-                print(f'ERROR: multiple ways to build output {t!r}')
+                print(f'ERROR: multiple ways to build {t!r}')
                 exit(1)
             rules[t] = rule
 
