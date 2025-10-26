@@ -105,7 +105,7 @@ def run_cmd(rule, options):
         built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
     all_out = []
-    for cmd in rule.cmds:
+    for cmd in [rule.cmd]: # XXX Collapse out old multiple command feature
         # Run command, capture/filter its output, and get its exit code.
         # XXX Do we want to add an additional check that all the targets must exist?
         with io_lock:
@@ -173,11 +173,11 @@ def run_cmd(rule, options):
         stdout_write(built_text)
 
 class Rule:
-    def __init__(self, targets, deps, cwd, cmds, d_file, order_only_deps, msvc_show_includes, stdout_filter, latency):
+    def __init__(self, targets, deps, cwd, cmd, d_file, order_only_deps, msvc_show_includes, stdout_filter, latency):
         self.targets = targets
         self.deps = deps
         self.cwd = cwd
-        self.cmds = cmds
+        self.cmd = cmd
         self.d_file = d_file
         self.order_only_deps = order_only_deps
         self.msvc_show_includes = msvc_show_includes
@@ -187,14 +187,14 @@ class Rule:
 
     # order_only_deps, stdout_filter, priority are excluded from signatures because none of them should affect the targets' new content.
     def signature(self):
-        info = (self.targets, self.deps, self.cwd, self.cmds, self.d_file, self.msvc_show_includes)
+        info = (self.targets, self.deps, self.cwd, self.cmd, self.d_file, self.msvc_show_includes)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
     def __init__(self):
         pass
 
-    def rule(self, targets, deps, cmds, *, d_file=None, order_only_deps=[], msvc_show_includes=False, stdout_filter=None, latency=1):
+    def rule(self, targets, deps, cmd, *, d_file=None, order_only_deps=[], msvc_show_includes=False, stdout_filter=None, latency=1):
         cwd = self.cwd
         if not isinstance(targets, list):
             assert isinstance(targets, str) # we expect targets to be either a str (a single target) or a list of targets
@@ -203,9 +203,8 @@ class BuildContext:
         if not isinstance(deps, list):
             assert isinstance(deps, str) # we expect deps to be either a str (a single dep) or a list of deps
             deps = [deps]
-        assert isinstance(cmds, list) # cmds is intended to be a list of lists of arg strings
-        if isinstance(cmds[0], str):
-            cmds = [cmds] # but, we allow just a single command as a list of strings -- wrap it with another list
+        assert isinstance(cmd, list), cmd # cmd is intended to be an argv list
+        assert all(isinstance(x, str) for x in cmd), cmd
         if d_file is not None:
             assert isinstance(d_file, str) # we expect d_file to be ether None or a str (the path of the .d file)
             d_file = normpath(joinpath(cwd, d_file))
@@ -213,7 +212,7 @@ class BuildContext:
         order_only_deps = [normpath(joinpath(cwd, x)) for x in order_only_deps]
         assert stdout_filter is None or isinstance(stdout_filter, str)
 
-        rule = Rule(targets, deps, cwd, cmds, d_file, order_only_deps, msvc_show_includes, stdout_filter, latency)
+        rule = Rule(targets, deps, cwd, cmd, d_file, order_only_deps, msvc_show_includes, stdout_filter, latency)
         for t in targets:
             if t in rules:
                 print(f'ERROR: multiple ways to build target {t!r}')
