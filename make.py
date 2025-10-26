@@ -127,7 +127,7 @@ def run_cmd(rule, args):
                 else:
                     new_out.append(line)
             with io_lock:
-                with open(rule.d_file, 'wt') as f:
+                with open(rule.depfile, 'wt') as f:
                     assert len(rule.targets) == 1
                     f.write(f'{rule.targets[0]}: \\\n')
                     for dep in sorted(deps):
@@ -174,7 +174,7 @@ class Rule:
         self.deps = deps
         self.cwd = cwd
         self.cmd = cmd
-        self.d_file = depfile
+        self.depfile = depfile
         self.order_only_inputs = order_only_inputs
         self.msvc_show_includes = msvc_show_includes
         self.output_exclude = output_exclude
@@ -183,7 +183,7 @@ class Rule:
 
     # order_only_inputs, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
     def signature(self):
-        info = (self.targets, self.deps, self.cwd, self.cmd, self.d_file, self.msvc_show_includes)
+        info = (self.targets, self.deps, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
@@ -201,7 +201,7 @@ class BuildContext:
         assert all(isinstance(x, str) for x in cmd), cmd
         cmd = cmd.copy()
         if depfile is not None:
-            assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the .d file)
+            assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the depfile)
             depfile = normpath(joinpath(cwd, depfile))
         if order_only_inputs is None:
             order_only_inputs = []
@@ -228,26 +228,26 @@ def build(target, args):
     if target in enqueued:
         return
 
-    # Recursively handle the dependencies, including .d file dependencies and order-only deps
+    # Recursively handle the dependencies, including depfile dependencies and order-only deps
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
-    d_file_deps = []
-    if rule.d_file and os.path.exists(rule.d_file):
+    depfile_deps = []
+    if rule.depfile and os.path.exists(rule.depfile):
         with io_lock:
-            with open(rule.d_file, 'rt') as f:
-                d_file_deps = f.read()
-        d_file_deps = d_file_deps.replace('\\\n', '')
-        if '\\' in d_file_deps: # shlex.split is slow, don't use it unless we really need it
-            d_file_deps = shlex.split(d_file_deps)[1:]
+            with open(rule.depfile, 'rt') as f:
+                depfile_deps = f.read()
+        depfile_deps = depfile_deps.replace('\\\n', '')
+        if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
+            depfile_deps = shlex.split(depfile_deps)[1:]
         else:
-            d_file_deps = d_file_deps.split()[1:]
-        d_file_deps = [normpath(joinpath(rule.cwd, x)) for x in d_file_deps]
-    for dep in itertools.chain(deps, d_file_deps, rule.order_only_inputs):
+            depfile_deps = depfile_deps.split()[1:]
+        depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
+    for dep in itertools.chain(deps, depfile_deps, rule.order_only_inputs):
         build(dep, args)
-    if any(dep not in completed for dep in itertools.chain(deps, d_file_deps, rule.order_only_inputs)):
+    if any(dep not in completed for dep in itertools.chain(deps, depfile_deps, rule.order_only_inputs)):
         return
 
     # Don't build if already up to date
-    # Slightly different rules for regular deps vs. d_file_deps -- always rebuild when a d_file_dep is nonexistent,
+    # Slightly different rules for regular deps vs. depfile_deps -- always rebuild when a depfile_dep is nonexistent,
     # whereas we want to fail with an error when a regular dep is nonexistent
     target_timestamp = min(get_timestamp_if_exists(t) for t in rule.targets)
     dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
@@ -261,7 +261,7 @@ def build(target, args):
             any_errors = True
             exit(1)
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
-        if all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in d_file_deps):
+        if all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
             if all(make_db[rule.cwd].get(t) == rule.signature() for t in rule.targets):
                 completed.add(target)
                 return
