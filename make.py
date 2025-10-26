@@ -195,7 +195,7 @@ class BuildContext:
     def __init__(self):
         pass
 
-    def add_rule(self, targets, deps, cmds, d_file=None, order_only_deps=[], msvc_show_includes=False, stdout_filter=None, latency=1):
+    def rule(self, targets, deps, cmds, d_file=None, order_only_deps=[], msvc_show_includes=False, stdout_filter=None, latency=1):
         cwd = self.cwd
         if not isinstance(targets, list):
             assert isinstance(targets, str) # we expect targets to be either a str (a single target) or a list of targets
