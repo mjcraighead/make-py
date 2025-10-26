@@ -191,9 +191,6 @@ class Rule:
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
-    def __init__(self):
-        pass
-
     def rule(self, targets, deps, cmd, *, d_file=None, order_only_deps=[], msvc_show_includes=False, stdout_filter=None, latency=1):
         cwd = self.cwd
         if not isinstance(targets, list):
