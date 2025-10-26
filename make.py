@@ -371,15 +371,13 @@ def get_usable_columns():
         (size_x, size_y, cursor_x, cursor_y, attr, win_left, win_top, win_right, win_bottom, win_max_x, win_max_y) = \
             struct.unpack('hhhhHhhhhhh', csbi.raw)
         return win_right - win_left
-    elif sys.platform.startswith('linux') or sys.platform.startswith('darwin'):
+    else:
         import fcntl, termios
         try:
-            cr = struct.unpack('hh', fcntl.ioctl(1, termios.TIOCGWINSZ, '1234'))
-        except:
+            rows, cols, _, _ = struct.unpack('hhhh', fcntl.ioctl(1, termios.TIOCGWINSZ, b'\0' * 8))
+        except OSError:
             return None
-        return cr[1] - 1
-    else:
-        return None # XXX maybe we can just use TIOCGWINSZ on *all* Unix platforms?  not sure if any of them don't support it
+        return cols - 1
 
 def propagate_latencies(target, latency):
     if target not in rules:
