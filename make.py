@@ -413,7 +413,7 @@ def main():
         if args.clean:
             dir = f'{cwd}/_out'
             if os.path.exists(dir):
-                stdout_write(f'Cleaning {dir!r}...\n')
+                print(f'Cleaning {dir!r}...')
                 shutil.rmtree(dir)
             db.clear()
         for (target, signature) in list(db.items()):
