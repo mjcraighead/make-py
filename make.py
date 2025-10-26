@@ -321,7 +321,7 @@ def validate_rules_ast(tree, path):
             for alias in node.names:
                 if alias.name not in {'os', 'platform'}:
                     raise SyntaxError(f'Import of {alias.name!r} not allowed (file {path!r}, line {lineno})')
-        if isinstance(node, ast.Constant) and isinstance(node.value, (float, complex)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)):
             raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
 
 def parse_rules_py(ctx, options, pathname, visited):
