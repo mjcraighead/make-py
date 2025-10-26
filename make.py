@@ -20,7 +20,6 @@
 
 import argparse
 import ast
-import errno
 import hashlib
 import importlib.util
 import itertools
