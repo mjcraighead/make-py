@@ -362,14 +362,11 @@ def parse_rules_py(ctx, args, pathname, visited):
 def get_usable_columns():
     if os.name == 'nt':
         import ctypes
-
-        h_stdout = ctypes.windll.kernel32.GetStdHandle(-11)
+        h_stdout = ctypes.windll.kernel32.GetStdHandle(-11) # STD_OUTPUT_HANDLE
         csbi = ctypes.create_string_buffer(22)
         if not ctypes.windll.kernel32.GetConsoleScreenBufferInfo(h_stdout, csbi):
             return None
-
-        (size_x, size_y, cursor_x, cursor_y, attr, win_left, win_top, win_right, win_bottom, win_max_x, win_max_y) = \
-            struct.unpack('hhhhHhhhhhh', csbi.raw)
+        (win_left, win_top, win_right, win_bottom) = struct.unpack('hhhhHhhhhhh', csbi.raw)[5:9]
         return win_right - win_left
     else:
         import fcntl, termios
