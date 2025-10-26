@@ -289,7 +289,7 @@ def build(target, args):
 
 class BuilderThread(threading.Thread):
     def __init__(self, args):
-        threading.Thread.__init__(self)
+        super().__init__()
         self.args = args
 
     def run(self):
