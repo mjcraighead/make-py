@@ -23,7 +23,6 @@ import errno
 import hashlib
 import importlib.util
 import itertools
-import multiprocessing
 import os
 import pickle
 import queue
@@ -402,7 +401,7 @@ def main():
     parser.add_option('--no-parallel', dest='parallel', action='store_false', default=True, help='disable parallel build')
     (options, args) = parser.parse_args()
     if options.jobs is None:
-        options.jobs = multiprocessing.cpu_count() # default to one job per CPU
+        options.jobs = os.cpu_count() # default to one job per CPU
     if options.files is None:
         options.files = ['rules.py'] # default to "-f rules.py"
     cwd = os.getcwd()
