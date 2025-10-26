@@ -453,8 +453,9 @@ def main():
                 # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
                 if any_errors:
                     break
+                completed_snapshot = completed.copy() # XXX still not quite threadsafe
                 if progress_line:
-                    incomplete_count = sum(1 for x in (visited - completed) if x in rules)
+                    incomplete_count = sum(1 for x in (visited - completed_snapshot) if x in rules)
                     if incomplete_count:
                         progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in set(building)))
                         progress = f'make.py: {incomplete_count} left, building: {progress}'
@@ -467,7 +468,7 @@ def main():
                     else:
                         progress = progress[0:usable_columns]
                     stdout_write('\r' + progress)
-                if all(target in completed for target in args.targets):
+                if all(target in completed_snapshot for target in args.targets):
                     break
                 time.sleep(0.1)
         else:
