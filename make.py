@@ -358,23 +358,11 @@ def parse_rules_py(ctx, args, pathname, visited):
     if hasattr(rules_py_module, 'rules'):
         rules_py_module.rules(ctx)
 
-# returns width-1 for interactive console, or None if stdout is redirected
 def get_usable_columns():
-    if os.name == 'nt':
-        import ctypes
-        h_stdout = ctypes.windll.kernel32.GetStdHandle(-11) # STD_OUTPUT_HANDLE
-        csbi = ctypes.create_string_buffer(22)
-        if not ctypes.windll.kernel32.GetConsoleScreenBufferInfo(h_stdout, csbi):
-            return None
-        (win_left, win_top, win_right, win_bottom) = struct.unpack('hhhhHhhhhhh', csbi.raw)[5:9]
-        return win_right - win_left
-    else:
-        import fcntl, termios
-        try:
-            rows, cols, _, _ = struct.unpack('hhhh', fcntl.ioctl(1, termios.TIOCGWINSZ, b'\0' * 8))
-        except OSError:
-            return None
-        return cols - 1
+    try:
+        return os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
+    except OSError:
+        return None # stdout is not attached to a terminal
 
 def propagate_latencies(target, latency):
     if target not in rules:
