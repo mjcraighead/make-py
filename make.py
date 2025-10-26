@@ -30,7 +30,6 @@ import queue
 import re
 import shlex
 import shutil
-import struct
 import subprocess
 import sys
 import threading
