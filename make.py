@@ -189,7 +189,7 @@ class Rule:
     # order_only_deps, stdout_filter, priority are excluded from signatures because none of them should affect the targets' new content.
     def signature(self):
         info = (self.targets, self.deps, self.cwd, self.cmds, self.d_file, self.msvc_show_includes)
-        return hashlib.sha256(pickle.dumps(info)).hexdigest()
+        return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
     def __init__(self):
