@@ -144,8 +144,8 @@ def run_cmd(rule, options):
                 out = ''
             else:
                 out = '\n'.join(new_out)
-        elif rule.stdout_filter:
-            r = re.compile(rule.stdout_filter)
+        elif rule.output_exclude:
+            r = re.compile(rule.output_exclude)
             out = '\n'.join(line for line in out.splitlines() if not r.match(line))
 
         if options.verbose or code:
@@ -173,7 +173,7 @@ def run_cmd(rule, options):
         stdout_write(built_text)
 
 class Rule:
-    def __init__(self, targets, deps, cwd, cmd, d_file, order_only_deps, msvc_show_includes, stdout_filter, latency):
+    def __init__(self, targets, deps, cwd, cmd, d_file, order_only_deps, msvc_show_includes, output_exclude, latency):
         self.targets = targets
         self.deps = deps
         self.cwd = cwd
@@ -181,17 +181,17 @@ class Rule:
         self.d_file = d_file
         self.order_only_deps = order_only_deps
         self.msvc_show_includes = msvc_show_includes
-        self.stdout_filter = stdout_filter
+        self.output_exclude = output_exclude
         self.latency = latency
         self.priority = 0
 
-    # order_only_deps, stdout_filter, priority are excluded from signatures because none of them should affect the targets' new content.
+    # order_only_deps, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
     def signature(self):
         info = (self.targets, self.deps, self.cwd, self.cmd, self.d_file, self.msvc_show_includes)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
 
 class BuildContext:
-    def rule(self, targets, deps, cmd, *, d_file=None, order_only_deps=[], msvc_show_includes=False, stdout_filter=None, latency=1):
+    def rule(self, targets, deps, cmd, *, d_file=None, order_only_deps=[], msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
         if not isinstance(targets, list):
             assert isinstance(targets, str) # we expect targets to be either a str (a single target) or a list of targets
@@ -207,9 +207,9 @@ class BuildContext:
             d_file = normpath(joinpath(cwd, d_file))
         assert isinstance(order_only_deps, list)
         order_only_deps = [normpath(joinpath(cwd, x)) for x in order_only_deps]
-        assert stdout_filter is None or isinstance(stdout_filter, str)
+        assert output_exclude is None or isinstance(output_exclude, str)
 
-        rule = Rule(targets, deps, cwd, cmd, d_file, order_only_deps, msvc_show_includes, stdout_filter, latency)
+        rule = Rule(targets, deps, cwd, cmd, d_file, order_only_deps, msvc_show_includes, output_exclude, latency)
         for t in targets:
             if t in rules:
                 print(f'ERROR: multiple ways to build target {t!r}')
