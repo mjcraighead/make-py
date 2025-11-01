@@ -144,14 +144,14 @@ def run_cmd(rule, args):
 
     if args.verbose or code:
         if os.name == 'nt':
-            out = '%s\n%s' % (subprocess.list2cmdline(rule.cmd), out)
+            quoted_cmd = subprocess.list2cmdline(rule.cmd)
         else:
-            out = '%s\n%s' % (' '.join(shlex.quote(x) for x in rule.cmd), out)
-        out = out.rstrip()
+            quoted_cmd = ' '.join(shlex.quote(x) for x in rule.cmd)
+        out = f'{quoted_cmd}\n{out}'.rstrip()
     if code:
         global any_errors
         any_errors = True
-        stdout_write('%s%s\n\n' % (built_text, out))
+        stdout_write(f'{built_text}{out}\n\n')
         for t in rule.targets:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(t)
@@ -160,7 +160,7 @@ def run_cmd(rule, args):
     for t in rule.targets:
         local_make_db[t] = rule.signature()
     if out:
-        stdout_write('%s%s\n\n' % (built_text, out))
+        stdout_write(f'{built_text}{out}\n\n')
     elif not progress_line:
         stdout_write(built_text)
 
