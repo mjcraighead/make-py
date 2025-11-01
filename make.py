@@ -96,7 +96,7 @@ def run_cmd(rule, args):
         if t in local_make_db:
             del local_make_db[t]
 
-    built_text = "Built '%s'.\n" % "'\n  and '".join(rule.targets)
+    built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in rule.targets)
     if progress_line: # need to precede "Built [...]" with erasing the current progress indicator
         built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
@@ -263,9 +263,9 @@ def build(target, args):
     for (dep, dep_timestamp) in zip(deps, dep_timestamps):
         if dep_timestamp < 0:
             if progress_line:
-                stdout_write("\r%s\rERROR: dependency '%s' of '%s' is nonexistent\n" % (' ' * usable_columns, dep, ' '.join(rule.targets)))
+                stdout_write('\r%s\rERROR: dependency %r of %s is nonexistent\n' % (' ' * usable_columns, dep, ', '.join(repr(t) for t in rule.targets)))
             else:
-                stdout_write("ERROR: dependency '%s' of '%s' is nonexistent\n" % (dep, ' '.join(rule.targets)))
+                stdout_write('ERROR: dependency %r of %s is nonexistent\n' % (dep, ' '.join(repr(t) for t in rule.targets)))
             global any_errors
             any_errors = True
             exit(1)
