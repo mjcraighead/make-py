@@ -100,66 +100,65 @@ def run_cmd(rule, args):
     if progress_line: # need to precede "Built [...]" with erasing the current progress indicator
         built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
-    all_out = []
-    for cmd in [rule.cmd]: # XXX Collapse out old multiple command feature
-        # Run command, capture/filter its output, and get its exit code.
-        # XXX Do we want to add an additional check that all the targets must exist?
+    # Run command, capture/filter its output, and get its exit code.
+    # XXX Do we want to add an additional check that all the targets must exist?
+    with io_lock:
+        try:
+            p = subprocess.Popen(rule.cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        except Exception as e:
+            p = None
+            out = str(e)
+            code = 1
+    if p is not None:
+        out = p.stdout.read().decode().strip() # XXX What encoding should we use here??  This assumes UTF-8
+        code = p.wait()
+    if rule.msvc_show_includes:
+        deps = set()
+        r = re.compile('^Note: including file:\\s*(.*)$')
+        new_out = []
+        for line in out.splitlines():
+            m = r.match(line)
+            if m:
+                dep = normpath(m.group(1))
+                if not dep.startswith('c:/program files'):
+                    deps.add(dep)
+            else:
+                new_out.append(line)
         with io_lock:
-            try:
-                p = subprocess.Popen(cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            except Exception as e:
-                p = None
-                out = str(e)
-                code = 1
-        if p is not None:
-            out = p.stdout.read().decode().strip() # XXX What encoding should we use here??  This assumes UTF-8
-            code = p.wait()
-        if rule.msvc_show_includes:
-            deps = set()
-            r = re.compile('^Note: including file:\\s*(.*)$')
-            new_out = []
-            for line in out.splitlines():
-                m = r.match(line)
-                if m:
-                    dep = normpath(m.group(1))
-                    if not dep.startswith('c:/program files'):
-                        deps.add(dep)
-                else:
-                    new_out.append(line)
-            with io_lock:
-                with open(rule.depfile, 'wt') as f:
-                    assert len(rule.targets) == 1
-                    f.write(f'{rule.targets[0]}: \\\n')
-                    for dep in sorted(deps):
-                        f.write(f'  {dep} \\\n')
-                    f.write('\n')
+            with open(rule.depfile, 'wt') as f:
+                assert len(rule.targets) == 1
+                f.write(f'{rule.targets[0]}: \\\n')
+                for dep in sorted(deps):
+                    f.write(f'  {dep} \\\n')
+                f.write('\n')
 
-            # In addition to filtering out the /showIncludes messages, filter the one remaining
-            # line of output where it just prints the source file name
-            if len(new_out) == 1:
-                out = ''
-            else:
-                out = '\n'.join(new_out)
-        elif rule.output_exclude:
-            r = re.compile(rule.output_exclude)
-            out = '\n'.join(line for line in out.splitlines() if not r.match(line))
+        # In addition to filtering out the /showIncludes messages, filter the one remaining
+        # line of output where it just prints the source file name
+        if len(new_out) == 1:
+            out = ''
+        else:
+            out = '\n'.join(new_out)
+    elif rule.output_exclude:
+        r = re.compile(rule.output_exclude)
+        out = '\n'.join(line for line in out.splitlines() if not r.match(line))
 
-        if args.verbose or code:
-            if os.name == 'nt':
-                out = '%s\n%s' % (subprocess.list2cmdline(cmd), out)
-            else:
-                out = '%s\n%s' % (' '.join(shlex.quote(x) for x in cmd), out)
-            out = out.rstrip()
-        if out:
-            all_out.append(out)
-        if code:
-            global any_errors
-            any_errors = True
-            stdout_write("%s%s\n\n" % (built_text, '\n'.join(all_out)))
-            for t in rule.targets:
-                with contextlib.suppress(FileNotFoundError):
-                    os.unlink(t)
-            exit(1)
+    if args.verbose or code:
+        if os.name == 'nt':
+            out = '%s\n%s' % (subprocess.list2cmdline(rule.cmd), out)
+        else:
+            out = '%s\n%s' % (' '.join(shlex.quote(x) for x in rule.cmd), out)
+        out = out.rstrip()
+    all_out = []
+    if out:
+        all_out.append(out)
+    if code:
+        global any_errors
+        any_errors = True
+        stdout_write("%s%s\n\n" % (built_text, '\n'.join(all_out)))
+        for t in rule.targets:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(t)
+        exit(1)
 
     for t in rule.targets:
         local_make_db[t] = rule.signature()
