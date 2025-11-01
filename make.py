@@ -96,10 +96,6 @@ def run_cmd(rule, args):
         if t in local_make_db:
             del local_make_db[t]
 
-    built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in rule.targets)
-    if progress_line: # need to precede "Built [...]" with erasing the current progress indicator
-        built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
-
     # Run command, capture/filter its output, and get its exit code.
     # XXX Do we want to add an additional check that all the targets must exist?
     with io_lock:
@@ -141,6 +137,10 @@ def run_cmd(rule, args):
     elif rule.output_exclude:
         r = re.compile(rule.output_exclude)
         out = '\n'.join(line for line in out.splitlines() if not r.match(line))
+
+    built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in rule.targets)
+    if progress_line: # need to precede "Built [...]" with erasing the current progress indicator
+        built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
     if args.verbose or code:
         if os.name == 'nt':
