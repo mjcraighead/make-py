@@ -281,7 +281,9 @@ def build(target, args):
         if not os.path.exists(target_dir):
             os.makedirs(target_dir)
 
-    if args.parallel:
+    if rule.cmd is None:
+        completed.update(rule.targets)
+    elif args.parallel:
         # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
         global priority_queue_counter
         task_queue.put((-rule.priority, priority_queue_counter, rule))
@@ -289,8 +291,7 @@ def build(target, args):
         enqueued.update(rule.targets)
     else:
         # Build the target immediately
-        if rule.cmd is not None:
-            run_cmd(rule, args)
+        run_cmd(rule, args)
         completed.update(rule.targets)
 
 class BuilderThread(threading.Thread):
@@ -303,10 +304,9 @@ class BuilderThread(threading.Thread):
             (priority, counter, rule) = task_queue.get()
             if rule is None:
                 break
-            if rule.cmd is not None:
-                building.update(rule.targets)
-                run_cmd(rule, self.args)
-                building.difference_update(rule.targets)
+            building.update(rule.targets)
+            run_cmd(rule, self.args)
+            building.difference_update(rule.targets)
             completed.update(rule.targets)
 
 # Reject disallowed constructs in rules.py
