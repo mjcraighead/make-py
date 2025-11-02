@@ -38,7 +38,6 @@ import time
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
 
-visited = set()
 enqueued = set()
 completed = set()
 building = set()
@@ -223,7 +222,7 @@ class BuildContext:
                 exit(1)
             rules[t] = rule
 
-def build(target, args):
+def build(target, args, visited):
     if target in visited or target in completed:
         return
     if target not in rules:
@@ -249,7 +248,7 @@ def build(target, args):
             depfile_deps = depfile_deps.split()[1:]
         depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
     for dep in itertools.chain(deps, depfile_deps, rule.order_only_inputs):
-        build(dep, args)
+        build(dep, args, visited)
     if any(dep not in completed for dep in itertools.chain(deps, depfile_deps, rule.order_only_inputs)):
         return
 
@@ -423,6 +422,7 @@ def main():
 
     # Set up rule DB, reading in make.db files as we go
     ctx = BuildContext()
+    visited = set()
     for f in args.files:
         parse_rules_py(ctx, args, normpath(joinpath(cwd, f)), visited)
     for target in args.targets:
@@ -458,9 +458,9 @@ def main():
         if args.parallel:
             # Enqueue work to the builders
             while True:
-                visited.clear()
+                visited = set()
                 for target in args.targets:
-                    build(target, args)
+                    build(target, args, visited)
                 if all(target in completed for target in args.targets):
                     break
 
@@ -495,7 +495,7 @@ def main():
                     break
         else:
             for target in args.targets:
-                build(target, args)
+                build(target, args, visited)
     finally:
         if args.parallel:
             # Shut down the system by sending sentinel tokens to all the threads
