@@ -162,8 +162,9 @@ def run_cmd(rule, args):
                 os.unlink(t)
         return False
 
+    signature = rule.signature()
     for t in rule.targets:
-        local_make_db[t] = rule.signature()
+        local_make_db[t] = signature
     if out:
         event_queue.put(('log', f'{built_text}{out}\n\n'))
     elif not show_progress_line:
