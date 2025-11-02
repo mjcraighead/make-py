@@ -49,6 +49,12 @@ event_queue = queue.Queue()
 priority_queue_counter = 0 # tiebreaker counter to fall back to FIFO when rule priorities are the same
 any_errors = False
 
+try:
+    usable_columns = os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
+except OSError:
+    usable_columns = None # stdout is not attached to a terminal
+show_progress_line = usable_columns is not None
+
 # On Windows, if one thread calls subprocess.Popen while another thread has a file handle from open()
 # open, the file handle will be incorrectly and unintentionally inherited by the child process.  This
 # leads to really strange file locking errors.  This problem has never existed on Unix, and was probably
@@ -139,7 +145,7 @@ def run_cmd(rule, args):
         out = '\n'.join(line for line in out.splitlines() if not r.match(line))
 
     built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in rule.targets)
-    if progress_line: # need to precede "Built [...]" with erasing the current progress indicator
+    if show_progress_line: # need to precede "Built [...]" with erasing the current progress indicator
         built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
     if args.verbose or code:
@@ -161,7 +167,7 @@ def run_cmd(rule, args):
         local_make_db[t] = rule.signature()
     if out:
         event_queue.put(('log', f'{built_text}{out}\n\n'))
-    elif not progress_line:
+    elif not show_progress_line:
         event_queue.put(('log', built_text))
     return True
 
@@ -259,7 +265,7 @@ def build(target, args, visited):
     dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
     for (dep, dep_timestamp) in zip(deps, dep_timestamps):
         if dep_timestamp < 0:
-            if progress_line:
+            if show_progress_line:
                 stdout_write('\r%s\rERROR: dependency %r of %s is nonexistent\n' % (' ' * usable_columns, dep, ', '.join(repr(t) for t in rule.targets)))
             else:
                 stdout_write('ERROR: dependency %r of %s is nonexistent\n' % (dep, ' '.join(repr(t) for t in rule.targets)))
@@ -355,12 +361,6 @@ def parse_rules_py(ctx, args, pathname, visited):
     if hasattr(rules_py_module, 'rules'):
         rules_py_module.rules(ctx)
 
-def get_usable_columns():
-    try:
-        return os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
-    except OSError:
-        return None # stdout is not attached to a terminal
-
 def propagate_latencies(target, latency):
     if target not in rules:
         return
@@ -406,10 +406,6 @@ def main():
 
     cwd = os.getcwd()
     args.targets = [normpath(joinpath(cwd, x)) for x in args.targets]
-
-    global progress_line, usable_columns
-    usable_columns = get_usable_columns()
-    progress_line = usable_columns is not None
 
     # Set up rule DB, reading in make.db files as we go
     ctx = BuildContext()
@@ -466,7 +462,7 @@ def main():
                     completed.update(info.targets)
             if any_errors:
                 break
-            if progress_line:
+            if show_progress_line:
                 incomplete_count = sum(1 for x in (visited - completed) if x in rules)
                 if incomplete_count:
                     progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in set(building)))
