@@ -57,6 +57,7 @@ any_errors = False
 # leads to really strange file locking errors.
 # XXX Split io_lock into stdout_lock and subprocess_io_lock
 # XXX Maybe make one or both conditional on platform (certainly I don't think Unix has the subprocess bug)
+# XXX This was probably fixed by: https://peps.python.org/pep-0446/
 io_lock = threading.Lock()
 
 # An atomic write to stdout from any thread
