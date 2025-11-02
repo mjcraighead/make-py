@@ -441,9 +441,9 @@ def main():
             db.clear()
         for (target, signature) in list(db.items()):
             if target not in rules:
-                if os.path.exists(target):
-                    print(f'Deleting stale target {target!r}...')
+                with contextlib.suppress(FileNotFoundError):
                     os.unlink(target)
+                    print(f'Deleted stale target {target!r}.')
                 del db[target]
 
     if args.parallel:
