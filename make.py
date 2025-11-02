@@ -52,10 +52,14 @@ any_errors = False
 
 # On Windows, if one thread calls subprocess.Popen while another thread has a file handle from open()
 # open, the file handle will be incorrectly and unintentionally inherited by the child process.  This
-# leads to really strange file locking errors.
-# XXX Remove this on Unix, which I believe has never suffered from this problem
-# XXX This was probably fixed on Windows too by: https://peps.python.org/pep-0446/
-popen_lock = threading.Lock()
+# leads to really strange file locking errors.  This problem has never existed on Unix, and was probably
+# fixed on Windows too by: https://peps.python.org/pep-0446/  Replace with a null lock for now and give
+# it extensive soak time before removing.
+class NullLock:
+    def __enter__(self): pass
+    def __exit__(self, *args): pass
+popen_lock = NullLock()
+#popen_lock = threading.Lock()
 
 def stdout_write(x):
     sys.stdout.write(x)
