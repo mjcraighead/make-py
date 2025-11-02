@@ -40,7 +40,6 @@ sys.dont_write_bytecode = True
 
 enqueued = set()
 completed = set()
-building = set()
 rules = {}
 make_db = {}
 normpath_cache = {}
@@ -441,8 +440,9 @@ def main():
 
     # Do the build, and try to shut down as cleanly as possible if we get a Ctrl-C
     try:
-        # Enqueue work to the builders
+        building = set()
         while True:
+            # Enqueue work to the builders
             visited = set()
             for target in args.targets:
                 build(target, args, visited)
