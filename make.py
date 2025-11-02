@@ -156,7 +156,7 @@ def run_cmd(rule, args):
         for t in rule.targets:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(t)
-        exit(1)
+        return False
 
     for t in rule.targets:
         local_make_db[t] = rule.signature()
@@ -164,6 +164,7 @@ def run_cmd(rule, args):
         stdout_write(f'{built_text}{out}\n\n')
     elif not progress_line:
         stdout_write(built_text)
+    return True
 
 class Rule:
     def __init__(self, targets, deps, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency):
@@ -287,7 +288,8 @@ def build(target, args):
     else:
         # Build the target immediately
         if rule.cmd is not None:
-            run_cmd(rule, args)
+            if not run_cmd(rule, args):
+                exit(1)
         completed.update(rule.targets)
 
 class BuilderThread(threading.Thread):
@@ -460,8 +462,6 @@ def main():
 
                 # Show progress update and exit if done, otherwise sleep to prevent burning 100% of CPU
                 # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
-                if any_errors:
-                    break
                 for (status, rule) in drain_event_queue():
                     if status == 'start':
                         building.update(rule.targets)
@@ -469,6 +469,8 @@ def main():
                         assert status == 'finish', status
                         building.difference_update(rule.targets)
                         completed.update(rule.targets)
+                if any_errors:
+                    break
                 if progress_line:
                     incomplete_count = sum(1 for x in (visited - completed) if x in rules)
                     if incomplete_count:
