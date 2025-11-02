@@ -407,10 +407,9 @@ def main():
     cwd = os.getcwd()
     args.targets = [normpath(joinpath(cwd, x)) for x in args.targets]
 
-    # XXX -v shuts off the progress indicator right now, but it seems like it probably should stay on
     global progress_line, usable_columns
     usable_columns = get_usable_columns()
-    progress_line = usable_columns is not None and not args.verbose
+    progress_line = usable_columns is not None
 
     # Set up rule DB, reading in make.db files as we go
     ctx = BuildContext()
