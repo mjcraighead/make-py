@@ -46,6 +46,7 @@ rules = {}
 make_db = {}
 normpath_cache = {}
 task_queue = queue.PriorityQueue()
+event_queue = queue.Queue()
 priority_queue_counter = 0 # tiebreaker counter to fall back to FIFO when rule priorities are the same
 any_errors = False
 
@@ -277,9 +278,7 @@ def build(target, args):
         if not os.path.exists(target_dir):
             os.makedirs(target_dir)
 
-    if rule.cmd is None:
-        completed.update(rule.targets)
-    elif args.parallel:
+    if args.parallel:
         # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
         global priority_queue_counter
         task_queue.put((-rule.priority, priority_queue_counter, rule))
@@ -287,7 +286,8 @@ def build(target, args):
         enqueued.update(rule.targets)
     else:
         # Build the target immediately
-        run_cmd(rule, args)
+        if rule.cmd is not None:
+            run_cmd(rule, args)
         completed.update(rule.targets)
 
 class BuilderThread(threading.Thread):
@@ -300,10 +300,10 @@ class BuilderThread(threading.Thread):
             (priority, counter, rule) = task_queue.get()
             if rule is None:
                 break
-            building.update(rule.targets)
-            run_cmd(rule, self.args)
-            building.difference_update(rule.targets)
-            completed.update(rule.targets)
+            if rule.cmd is not None:
+                event_queue.put(('start', rule))
+                run_cmd(rule, self.args)
+            event_queue.put(('finish', rule))
 
 # Reject disallowed constructs in rules.py
 def validate_rules_ast(tree, path):
@@ -381,6 +381,19 @@ def propagate_latencies(target, latency):
     for dep in itertools.chain(deps, rule.order_only_inputs):
         propagate_latencies(dep, latency)
 
+def drain_event_queue():
+    try:
+        # Warning: this blocks KeyboardInterrupt during the timeout on Windows
+        events = [event_queue.get(timeout=0.05 if os.name == 'nt' else None)]
+    except queue.Empty:
+        return []
+    while True:
+        try:
+            events.append(event_queue.get_nowait())
+        except queue.Empty:
+            break
+    return events
+
 def main():
     # Parse command line
     parser = argparse.ArgumentParser()
@@ -449,9 +462,15 @@ def main():
                 # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
                 if any_errors:
                     break
-                completed_snapshot = completed.copy() # XXX still not quite threadsafe
+                for (status, rule) in drain_event_queue():
+                    if status == 'start':
+                        building.update(rule.targets)
+                    else:
+                        assert status == 'finish', status
+                        building.difference_update(rule.targets)
+                        completed.update(rule.targets)
                 if progress_line:
-                    incomplete_count = sum(1 for x in (visited - completed_snapshot) if x in rules)
+                    incomplete_count = sum(1 for x in (visited - completed) if x in rules)
                     if incomplete_count:
                         progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in set(building)))
                         progress = f'make.py: {incomplete_count} left, building: {progress}'
@@ -464,9 +483,8 @@ def main():
                     else:
                         progress = progress[0:usable_columns]
                     stdout_write('\r' + progress)
-                if all(target in completed_snapshot for target in args.targets):
+                if all(target in completed for target in args.targets):
                     break
-                time.sleep(0.1)
         else:
             for target in args.targets:
                 build(target, args)
