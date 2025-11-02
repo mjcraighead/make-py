@@ -278,18 +278,11 @@ def build(target, args, visited):
         if not os.path.exists(target_dir):
             os.makedirs(target_dir)
 
-    if args.parallel:
-        # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
-        global priority_queue_counter
-        task_queue.put((-rule.priority, priority_queue_counter, rule))
-        priority_queue_counter += 1
-        enqueued.update(rule.targets)
-    else:
-        # Build the target immediately
-        if rule.cmd is not None:
-            if not run_cmd(rule, args):
-                exit(1)
-        completed.update(rule.targets)
+    # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
+    global priority_queue_counter
+    task_queue.put((-rule.priority, priority_queue_counter, rule))
+    priority_queue_counter += 1
+    enqueued.update(rule.targets)
 
 class BuilderThread(threading.Thread):
     def __init__(self, args):
@@ -404,7 +397,6 @@ def main():
     parser.add_argument('-f', '--file', dest='files', action='append', help='specify the path to a rules.py file (default is "rules.py")', metavar='FILE')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose build output')
-    parser.add_argument('--no-parallel', dest='parallel', action='store_false', help='disable parallel build')
     parser.add_argument('targets', nargs='*', help='targets to build')
     args = parser.parse_args()
     if args.jobs is None:
@@ -415,10 +407,10 @@ def main():
     cwd = os.getcwd()
     args.targets = [normpath(joinpath(cwd, x)) for x in args.targets]
 
-    # Presumably -v should shut off the progress indicator; supporting it w/ --no-parallel seems like extra work for no gain.
+    # XXX -v shuts off the progress indicator right now, but it seems like it probably should stay on
     global progress_line, usable_columns
     usable_columns = get_usable_columns()
-    progress_line = usable_columns is not None and not args.verbose and args.parallel
+    progress_line = usable_columns is not None and not args.verbose
 
     # Set up rule DB, reading in make.db files as we go
     ctx = BuildContext()
@@ -446,63 +438,57 @@ def main():
                     print(f'Deleted stale target {target!r}.')
                 del db[target]
 
-    if args.parallel:
-        # Create and start builder threads
-        threads = [BuilderThread(args) for i in range(args.jobs)]
-        for t in threads:
-            t.daemon = True
-            t.start()
+    # Create and start builder threads
+    threads = [BuilderThread(args) for i in range(args.jobs)]
+    for t in threads:
+        t.daemon = True
+        t.start()
 
     # Do the build, and try to shut down as cleanly as possible if we get a Ctrl-C
     try:
-        if args.parallel:
-            # Enqueue work to the builders
-            while True:
-                visited = set()
-                for target in args.targets:
-                    build(target, args, visited)
-                if all(target in completed for target in args.targets):
-                    break
-
-                # Handle events from builder threads, then show progress update and exit if done
-                # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
-                for (status, info) in drain_event_queue():
-                    if status == 'log':
-                        stdout_write(info)
-                    elif status == 'start':
-                        building.update(info.targets)
-                    else:
-                        assert status == 'finish', status
-                        building.difference_update(info.targets)
-                        completed.update(info.targets)
-                if any_errors:
-                    break
-                if progress_line:
-                    incomplete_count = sum(1 for x in (visited - completed) if x in rules)
-                    if incomplete_count:
-                        progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in set(building)))
-                        progress = f'make.py: {incomplete_count} left, building: {progress}'
-                    else:
-                        progress = ''
-                    if len(progress) < usable_columns:
-                        pad = usable_columns - len(progress)
-                        progress += ' ' * pad # erase old contents
-                        progress += '\b' * pad # put cursor back at end of line
-                    else:
-                        progress = progress[0:usable_columns]
-                    stdout_write('\r' + progress)
-                if all(target in completed for target in args.targets):
-                    break
-        else:
+        # Enqueue work to the builders
+        while True:
+            visited = set()
             for target in args.targets:
                 build(target, args, visited)
+            if all(target in completed for target in args.targets):
+                break
+
+            # Handle events from builder threads, then show progress update and exit if done
+            # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
+            for (status, info) in drain_event_queue():
+                if status == 'log':
+                    stdout_write(info)
+                elif status == 'start':
+                    building.update(info.targets)
+                else:
+                    assert status == 'finish', status
+                    building.difference_update(info.targets)
+                    completed.update(info.targets)
+            if any_errors:
+                break
+            if progress_line:
+                incomplete_count = sum(1 for x in (visited - completed) if x in rules)
+                if incomplete_count:
+                    progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in set(building)))
+                    progress = f'make.py: {incomplete_count} left, building: {progress}'
+                else:
+                    progress = ''
+                if len(progress) < usable_columns:
+                    pad = usable_columns - len(progress)
+                    progress += ' ' * pad # erase old contents
+                    progress += '\b' * pad # put cursor back at end of line
+                else:
+                    progress = progress[0:usable_columns]
+                stdout_write('\r' + progress)
+            if all(target in completed for target in args.targets):
+                break
     finally:
-        if args.parallel:
-            # Shut down the system by sending sentinel tokens to all the threads
-            for i in range(args.jobs):
-                task_queue.put((1000000, 0, None)) # lower priority than any real rule
-            for t in threads:
-                t.join()
+        # Shut down the system by sending sentinel tokens to all the threads
+        for i in range(args.jobs):
+            task_queue.put((1000000, 0, None)) # lower priority than any real rule
+        for t in threads:
+            t.join()
 
         # Write out the final make.db files
         # XXX May want to do this "occasionally" as the build is running?  (not too often to avoid a perf hit, but often
