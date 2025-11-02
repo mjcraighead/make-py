@@ -436,7 +436,7 @@ def main():
     # Create and start builder threads
     threads = [BuilderThread(args) for i in range(args.jobs)]
     for t in threads:
-        t.daemon = True
+        t.daemon = True # XXX this should probably be removed, but make sure Ctrl-C handling is correct
         t.start()
 
     # Do the build, and try to shut down as cleanly as possible if we get a Ctrl-C
