@@ -385,11 +385,13 @@ def propagate_latencies(target, latency):
         propagate_latencies(dep, latency)
 
 def drain_event_queue():
-    try:
-        # Warning: this blocks KeyboardInterrupt during the timeout on Windows
-        events = [event_queue.get(timeout=0.05 if os.name == 'nt' else None)]
-    except queue.Empty:
-        return []
+    while True:
+        try:
+            # Warning: this blocks KeyboardInterrupt during the timeout on Windows
+            events = [event_queue.get(timeout=0.05 if os.name == 'nt' else None)]
+            break
+        except queue.Empty:
+            continue # keep trying until we get at least one event (only hit on Windows)
     while True:
         try:
             events.append(event_queue.get_nowait())
@@ -460,8 +462,10 @@ def main():
                 visited.clear()
                 for target in args.targets:
                     build(target, args)
+                if all(target in completed for target in args.targets):
+                    break
 
-                # Show progress update and exit if done, otherwise sleep to prevent burning 100% of CPU
+                # Handle events from builder threads, then show progress update and exit if done
                 # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
                 for (status, rule) in drain_event_queue():
                     if status == 'start':
