@@ -50,21 +50,16 @@ event_queue = queue.Queue()
 priority_queue_counter = 0 # tiebreaker counter to fall back to FIFO when rule priorities are the same
 any_errors = False
 
-# This is used to work around some Python bugs:
-# 1. It would be nice if sys.stdout.write from multiple threads were atomic, but I've observed problems.
-# 2. On Windows, if one thread calls subprocess.Popen while another thread has a file handle from open()
+# On Windows, if one thread calls subprocess.Popen while another thread has a file handle from open()
 # open, the file handle will be incorrectly and unintentionally inherited by the child process.  This
 # leads to really strange file locking errors.
-# XXX Split io_lock into stdout_lock and subprocess_io_lock
-# XXX Maybe make one or both conditional on platform (certainly I don't think Unix has the subprocess bug)
-# XXX This was probably fixed by: https://peps.python.org/pep-0446/
-io_lock = threading.Lock()
+# XXX Remove this on Unix, which I believe has never suffered from this problem
+# XXX This was probably fixed on Windows too by: https://peps.python.org/pep-0446/
+popen_lock = threading.Lock()
 
-# An atomic write to stdout from any thread
 def stdout_write(x):
-    with io_lock:
-        sys.stdout.write(x)
-        sys.stdout.flush()
+    sys.stdout.write(x)
+    sys.stdout.flush() # always flush log writes immediately
 
 # Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
@@ -100,7 +95,7 @@ def run_cmd(rule, args):
 
     # Run command, capture/filter its output, and get its exit code.
     # XXX Do we want to add an additional check that all the targets must exist?
-    with io_lock:
+    with popen_lock:
         try:
             p = subprocess.Popen(rule.cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         except Exception as e:
@@ -122,7 +117,7 @@ def run_cmd(rule, args):
                     deps.add(dep)
             else:
                 new_out.append(line)
-        with io_lock:
+        with popen_lock:
             with open(rule.depfile, 'wt') as f:
                 assert len(rule.targets) == 1
                 f.write(f'{rule.targets[0]}: \\\n')
@@ -153,7 +148,7 @@ def run_cmd(rule, args):
     if code:
         global any_errors
         any_errors = True
-        stdout_write(f'{built_text}{out}\n\n')
+        event_queue.put(('log', f'{built_text}{out}\n\n'))
         for t in rule.targets:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(t)
@@ -162,9 +157,9 @@ def run_cmd(rule, args):
     for t in rule.targets:
         local_make_db[t] = rule.signature()
     if out:
-        stdout_write(f'{built_text}{out}\n\n')
+        event_queue.put(('log', f'{built_text}{out}\n\n'))
     elif not progress_line:
-        stdout_write(built_text)
+        event_queue.put(('log', built_text))
     return True
 
 class Rule:
@@ -240,7 +235,7 @@ def build(target, args):
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     depfile_deps = []
     if rule.depfile and os.path.exists(rule.depfile):
-        with io_lock:
+        with popen_lock:
             with open(rule.depfile, 'rt') as f:
                 depfile_deps = f.read()
         depfile_deps = depfile_deps.replace('\\\n', '')
@@ -467,13 +462,15 @@ def main():
 
                 # Handle events from builder threads, then show progress update and exit if done
                 # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
-                for (status, rule) in drain_event_queue():
-                    if status == 'start':
-                        building.update(rule.targets)
+                for (status, info) in drain_event_queue():
+                    if status == 'log':
+                        stdout_write(info)
+                    elif status == 'start':
+                        building.update(info.targets)
                     else:
                         assert status == 'finish', status
-                        building.difference_update(rule.targets)
-                        completed.update(rule.targets)
+                        building.difference_update(info.targets)
+                        completed.update(info.targets)
                 if any_errors:
                     break
                 if progress_line:
