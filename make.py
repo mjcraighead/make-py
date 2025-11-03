@@ -124,7 +124,7 @@ def run_cmd(rule, args):
             else:
                 new_out.append(line)
         with popen_lock:
-            with open(rule.depfile, 'wt') as f:
+            with open(rule.depfile, 'w') as f:
                 assert len(rule.targets) == 1
                 f.write(f'{rule.targets[0]}: \\\n')
                 for dep in sorted(deps):
@@ -243,7 +243,7 @@ def build(target, args, visited, enqueued, completed):
     depfile_deps = []
     if rule.depfile and os.path.exists(rule.depfile):
         with popen_lock:
-            with open(rule.depfile, 'rt') as f:
+            with open(rule.depfile, 'r') as f:
                 depfile_deps = f.read()
         depfile_deps = depfile_deps.replace('\\\n', '')
         if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
