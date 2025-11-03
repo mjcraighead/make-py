@@ -466,7 +466,7 @@ def main():
             if show_progress_line:
                 incomplete_count = sum(1 for x in (visited - completed) if x in rules)
                 if incomplete_count:
-                    progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in set(building)))
+                    progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in building))
                     progress = f'make.py: {incomplete_count} left, building: {progress}'
                 else:
                     progress = ''
