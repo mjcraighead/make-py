@@ -39,8 +39,8 @@ import time
 sys.dont_write_bytecode = True
 
 rules = {}
-make_db = {}
-normpath_cache = {}
+make_db = {} # XXX Accesses are not threadsafe right now
+normpath_cache = {} # XXX Accesses are not threadsafe right now, though this only matters for msvc_show_includes
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
 priority_queue_counter = 0 # tiebreaker counter to fall back to FIFO when rule priorities are the same
@@ -97,7 +97,7 @@ def run_cmd(rule, args):
         with contextlib.suppress(FileNotFoundError):
             os.unlink(t)
         if t in local_make_db:
-            del local_make_db[t]
+            del local_make_db[t] # XXX Might be able to make this threadsafe w/o lock by overwriting with None
 
     # Run command, capture/filter its output, and get its exit code.
     # XXX Do we want to add an additional check that all the targets must exist?
