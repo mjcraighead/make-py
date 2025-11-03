@@ -273,7 +273,7 @@ def build(target, args, visited, enqueued, completed):
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
         if all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
             if all(make_db[rule.cwd].get(t) == rule.signature() for t in rule.targets):
-                completed.add(target)
+                completed.add(target) # XXX should probably be completed.update(rule.targets)
                 return
 
     # Create the directories that the targets are going to live in, if they don't already exist
