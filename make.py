@@ -492,9 +492,10 @@ def main():
         for (cwd, db) in make_db.items():
             with contextlib.suppress(FileExistsError):
                 os.mkdir(f'{cwd}/_out')
-            with open(f'{cwd}/_out/make.db', 'w') as f:
+            with open(f'{cwd}/_out/make.db.tmp', 'w') as f:
                 for (target, signature) in db.items():
                     f.write(f'{target} {signature}\n')
+            os.replace(f'{cwd}/_out/make.db.tmp', f'{cwd}/_out/make.db')
 
     if any_errors:
         exit(1)
