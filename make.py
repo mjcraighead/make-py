@@ -38,8 +38,6 @@ import time
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
 
-enqueued = set()
-completed = set()
 rules = {}
 make_db = {}
 normpath_cache = {}
@@ -228,7 +226,7 @@ class BuildContext:
                 exit(1)
             rules[t] = rule
 
-def build(target, args, visited):
+def build(target, args, visited, enqueued, completed):
     if target in visited or target in completed:
         return
     if target not in rules:
@@ -254,7 +252,7 @@ def build(target, args, visited):
             depfile_deps = depfile_deps.split()[1:]
         depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
     for dep in itertools.chain(deps, depfile_deps, rule.order_only_inputs):
-        build(dep, args, visited)
+        build(dep, args, visited, enqueued, completed)
     if any(dep not in completed for dep in itertools.chain(deps, depfile_deps, rule.order_only_inputs)):
         return
 
@@ -441,12 +439,14 @@ def main():
 
     # Do the build, and try to shut down as cleanly as possible if we get a Ctrl-C
     try:
+        enqueued = set()
+        completed = set()
         building = set()
         while True:
             # Enqueue work to the builders
             visited = set()
             for target in args.targets:
-                build(target, args, visited)
+                build(target, args, visited, enqueued, completed)
             if all(target in completed for target in args.targets):
                 break
 
