@@ -91,14 +91,6 @@ else:
         return path if path[0] == '/' else f'{cwd}/{path}'
 
 def run_cmd(rule, args):
-    # Always delete the targets first
-    local_make_db = make_db[rule.cwd]
-    for t in rule.targets:
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(t)
-        if t in local_make_db:
-            del local_make_db[t] # XXX Might be able to make this threadsafe w/o lock by overwriting with None
-
     # Run command, capture/filter its output, and get its exit code.
     # XXX Do we want to add an additional check that all the targets must exist?
     with popen_lock:
@@ -160,6 +152,7 @@ def run_cmd(rule, args):
                 os.unlink(t)
         return False
 
+    local_make_db = make_db[rule.cwd]
     signature = rule.signature()
     for t in rule.targets:
         local_make_db[t] = signature
@@ -259,11 +252,12 @@ def build(target, args, visited, enqueued, completed):
             exit(1)
 
     # Do all targets exist, and are all of them at least as new as every single dep?
+    local_make_db = make_db[rule.cwd]
     target_timestamp = min(get_timestamp_if_exists(t) for t in rule.targets) # oldest target timestamp, or -1.0 if any target is nonexistent
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
         # Is the rule's signature identical to the last time we ran it?
         signature = rule.signature()
-        if all(make_db[rule.cwd].get(t) == signature for t in rule.targets):
+        if all(local_make_db.get(t) == signature for t in rule.targets):
             # Parse the depfile, if present
             depfile_deps = []
             if rule.depfile:
@@ -284,6 +278,12 @@ def build(target, args, visited, enqueued, completed):
             if depfile_deps is not None and all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
                 completed.update(rule.targets)
                 return # skip the build
+
+    # Remove stale targets immediately once this rule is marked dirty
+    for t in rule.targets:
+        with contextlib.suppress(FileNotFoundError):
+            os.unlink(t)
+        local_make_db.pop(t, None) # XXX Probably better to store a None tombstone here for lock-free updates
 
     # Ensure targets' parent directories exist
     for t in rule.targets:
