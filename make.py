@@ -162,6 +162,21 @@ def run_cmd(rule, args):
         event_queue.put(('log', built_text))
     return True
 
+class BuilderThread(threading.Thread):
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+
+    def run(self):
+        while not any_errors:
+            (priority, counter, rule) = task_queue.get()
+            if rule is None:
+                break
+            if rule.cmd is not None:
+                event_queue.put(('start', rule))
+                run_cmd(rule, self.args)
+            event_queue.put(('finish', rule))
+
 class Rule:
     def __init__(self, targets, deps, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency):
         self.targets = targets
@@ -292,21 +307,6 @@ def build(target, args, visited, enqueued, completed):
     # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
     task_queue.put((-rule.priority, next(priority_queue_counter), rule))
     enqueued.update(rule.targets)
-
-class BuilderThread(threading.Thread):
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-
-    def run(self):
-        while not any_errors:
-            (priority, counter, rule) = task_queue.get()
-            if rule is None:
-                break
-            if rule.cmd is not None:
-                event_queue.put(('start', rule))
-                run_cmd(rule, self.args)
-            event_queue.put(('finish', rule))
 
 # Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
 def validate_rules_ast(tree, path):
