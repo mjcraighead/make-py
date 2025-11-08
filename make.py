@@ -90,7 +90,7 @@ else:
     def joinpath(cwd, path):
         return path if path[0] == '/' else f'{cwd}/{path}'
 
-def run_cmd(rule, verbose):
+def execute(rule, verbose):
     # Run command, capture/filter its output, and get its exit code.
     # XXX Do we want to add an additional check that all the targets must exist?
     with popen_lock:
@@ -174,7 +174,7 @@ class BuilderThread(threading.Thread):
                 break
             if rule.cmd is not None:
                 event_queue.put(('start', rule))
-                run_cmd(rule, self.verbose)
+                execute(rule, self.verbose)
             event_queue.put(('finish', rule))
 
 class Rule:
@@ -234,7 +234,7 @@ class BuildContext:
                 exit(1)
             rules[t] = rule
 
-def build(target, visited, enqueued, completed):
+def schedule(target, visited, enqueued, completed):
     if target in visited or target in completed:
         return
     if target not in rules:
@@ -250,7 +250,7 @@ def build(target, visited, enqueued, completed):
     # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous build
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     for dep in itertools.chain(deps, rule.order_only_inputs):
-        build(dep, visited, enqueued, completed)
+        schedule(dep, visited, enqueued, completed)
     if any(dep not in completed for dep in itertools.chain(deps, rule.order_only_inputs)):
         return
 
@@ -455,7 +455,7 @@ def main():
             # Enqueue work to the builders
             visited = set()
             for target in args.targets:
-                build(target, visited, enqueued, completed)
+                schedule(target, visited, enqueued, completed)
             if all(target in completed for target in args.targets):
                 break
 
