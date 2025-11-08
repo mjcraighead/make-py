@@ -234,7 +234,7 @@ class BuildContext:
                 exit(1)
             rules[t] = rule
 
-def build(target, args, visited, enqueued, completed):
+def build(target, visited, enqueued, completed):
     if target in visited or target in completed:
         return
     if target not in rules:
@@ -250,7 +250,7 @@ def build(target, args, visited, enqueued, completed):
     # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous build
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     for dep in itertools.chain(deps, rule.order_only_inputs):
-        build(dep, args, visited, enqueued, completed)
+        build(dep, visited, enqueued, completed)
     if any(dep not in completed for dep in itertools.chain(deps, rule.order_only_inputs)):
         return
 
@@ -455,7 +455,7 @@ def main():
             # Enqueue work to the builders
             visited = set()
             for target in args.targets:
-                build(target, args, visited, enqueued, completed)
+                build(target, visited, enqueued, completed)
             if all(target in completed for target in args.targets):
                 break
 
