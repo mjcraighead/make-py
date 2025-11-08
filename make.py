@@ -266,19 +266,22 @@ def build(target, args, visited, enqueued, completed):
         if all(make_db[rule.cwd].get(t) == signature for t in rule.targets):
             # Parse the depfile, if present
             depfile_deps = []
-            if rule.depfile and os.path.exists(rule.depfile):
-                with popen_lock:
-                    with open(rule.depfile) as f:
-                        depfile_deps = f.read()
-                depfile_deps = depfile_deps.replace('\\\n', '')
-                if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
-                    depfile_deps = shlex.split(depfile_deps)[1:]
-                else:
-                    depfile_deps = depfile_deps.split()[1:]
-                depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
+            if rule.depfile:
+                try:
+                    with popen_lock:
+                        with open(rule.depfile) as f:
+                            depfile_deps = f.read()
+                    depfile_deps = depfile_deps.replace('\\\n', '')
+                    if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
+                        depfile_deps = shlex.split(depfile_deps)[1:]
+                    else:
+                        depfile_deps = depfile_deps.split()[1:]
+                    depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
+                except FileNotFoundError:
+                    depfile_deps = None # depfile was expected but missing -- always dirty
 
             # Do all depfile_deps exist, and are all targets at least as new as every single depfile_dep?
-            if all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
+            if depfile_deps is not None and all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
                 completed.update(rule.targets)
                 return # skip the build
 
