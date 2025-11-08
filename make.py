@@ -177,63 +177,6 @@ class BuilderThread(threading.Thread):
                 execute(rule, self.verbose)
             event_queue.put(('finish', rule))
 
-class Rule:
-    def __init__(self, targets, deps, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency):
-        self.targets = targets
-        self.deps = deps
-        self.cwd = cwd
-        self.cmd = cmd
-        self.depfile = depfile
-        self.order_only_inputs = order_only_inputs
-        self.msvc_show_includes = msvc_show_includes
-        self.output_exclude = output_exclude
-        self.latency = latency
-        self.priority = 0
-
-    # order_only_inputs, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
-    def signature(self):
-        info = (self.targets, self.deps, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
-        return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
-
-class BuildContext:
-    def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
-        cwd = self.cwd
-        if not isinstance(outputs, list):
-            assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
-            outputs = [outputs]
-        if cmd is None: # phony rule -- no command -- XXX do we want to support phony rules with commands?
-            assert all(o.startswith(':') for o in outputs), outputs # phony rule targets must start with :
-            assert depfile is None, depfile # phony rules cannot have depfiles
-            assert order_only_inputs is None, order_only_inputs # phony rules cannot have order_only_inputs
-            assert msvc_show_includes == False, msvc_show_includes # phony rules cannot set msvc_show_includes
-            assert output_exclude is None, output_exclude # phony rules cannot set output_exclude
-            # XXX override latency = 0?
-        else: # real rule -- has a command
-            assert all(o.startswith('_out/') for o in outputs), outputs # real rule targets must start with _out/
-            assert isinstance(cmd, list), cmd # real rules must have a command, which is an argv list
-            assert all(isinstance(x, str) for x in cmd), cmd
-            cmd = cmd.copy()
-        outputs = [normpath(joinpath(cwd, x)) for x in outputs]
-        if not isinstance(inputs, list):
-            assert isinstance(inputs, str) # we expect inputs to be either a str (a single input) or a list of inputs
-            inputs = [inputs]
-        inputs = inputs.copy()
-        if depfile is not None:
-            assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the depfile)
-            depfile = normpath(joinpath(cwd, depfile))
-        if order_only_inputs is None:
-            order_only_inputs = []
-        assert isinstance(order_only_inputs, list)
-        order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
-        assert output_exclude is None or isinstance(output_exclude, str)
-
-        rule = Rule(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
-        for t in outputs:
-            if t in rules:
-                print(f'ERROR: multiple ways to build {t!r}')
-                exit(1)
-            rules[t] = rule
-
 def schedule(target, visited, enqueued, completed):
     if target in visited or target in completed:
         return
@@ -307,6 +250,63 @@ def schedule(target, visited, enqueued, completed):
     # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
     task_queue.put((-rule.priority, next(priority_queue_counter), rule))
     enqueued.update(rule.targets)
+
+class Rule:
+    def __init__(self, targets, deps, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency):
+        self.targets = targets
+        self.deps = deps
+        self.cwd = cwd
+        self.cmd = cmd
+        self.depfile = depfile
+        self.order_only_inputs = order_only_inputs
+        self.msvc_show_includes = msvc_show_includes
+        self.output_exclude = output_exclude
+        self.latency = latency
+        self.priority = 0
+
+    # order_only_inputs, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
+    def signature(self):
+        info = (self.targets, self.deps, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
+        return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
+
+class BuildContext:
+    def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
+        cwd = self.cwd
+        if not isinstance(outputs, list):
+            assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
+            outputs = [outputs]
+        if cmd is None: # phony rule -- no command -- XXX do we want to support phony rules with commands?
+            assert all(o.startswith(':') for o in outputs), outputs # phony rule targets must start with :
+            assert depfile is None, depfile # phony rules cannot have depfiles
+            assert order_only_inputs is None, order_only_inputs # phony rules cannot have order_only_inputs
+            assert msvc_show_includes == False, msvc_show_includes # phony rules cannot set msvc_show_includes
+            assert output_exclude is None, output_exclude # phony rules cannot set output_exclude
+            # XXX override latency = 0?
+        else: # real rule -- has a command
+            assert all(o.startswith('_out/') for o in outputs), outputs # real rule targets must start with _out/
+            assert isinstance(cmd, list), cmd # real rules must have a command, which is an argv list
+            assert all(isinstance(x, str) for x in cmd), cmd
+            cmd = cmd.copy()
+        outputs = [normpath(joinpath(cwd, x)) for x in outputs]
+        if not isinstance(inputs, list):
+            assert isinstance(inputs, str) # we expect inputs to be either a str (a single input) or a list of inputs
+            inputs = [inputs]
+        inputs = inputs.copy()
+        if depfile is not None:
+            assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the depfile)
+            depfile = normpath(joinpath(cwd, depfile))
+        if order_only_inputs is None:
+            order_only_inputs = []
+        assert isinstance(order_only_inputs, list)
+        order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
+        assert output_exclude is None or isinstance(output_exclude, str)
+
+        rule = Rule(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
+        for t in outputs:
+            if t in rules:
+                print(f'ERROR: multiple ways to build {t!r}')
+                exit(1)
+            rules[t] = rule
 
 # Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
 def validate_rules_ast(tree, path):
