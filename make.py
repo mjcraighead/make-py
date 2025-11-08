@@ -345,7 +345,7 @@ def parse_rules_py(ctx, args, pathname, visited):
     if dir not in make_db:
         make_db[dir] = {}
         path = f'{dir}/_out/make.db'
-        if os.path.exists(path):
+        with contextlib.suppress(FileNotFoundError):
             with open(path) as f:
                 for line in f:
                     (target, signature) = line.rstrip().rsplit(' ', 1)
