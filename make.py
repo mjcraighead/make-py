@@ -43,7 +43,7 @@ make_db = {} # XXX Accesses are not threadsafe right now
 normpath_cache = {} # XXX Accesses are not threadsafe right now, though this only matters for msvc_show_includes
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
-priority_queue_counter = 0 # tiebreaker counter to fall back to FIFO when rule priorities are the same
+priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when rule priorities are the same
 any_errors = False
 
 try:
@@ -283,9 +283,7 @@ def build(target, args, visited, enqueued, completed):
             os.makedirs(target_dir)
 
     # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
-    global priority_queue_counter
-    task_queue.put((-rule.priority, priority_queue_counter, rule))
-    priority_queue_counter += 1
+    task_queue.put((-rule.priority, next(priority_queue_counter), rule))
     enqueued.update(rule.targets)
 
 class BuilderThread(threading.Thread):
