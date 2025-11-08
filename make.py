@@ -364,7 +364,10 @@ def parse_rules_py(ctx, args, pathname, visited):
     if hasattr(rules_py_module, 'rules'):
         rules_py_module.rules(ctx)
 
-def propagate_latencies(target, latency):
+def propagate_latencies(target, latency, _active):
+    if target in _active:
+        print(f'ERROR: cycle detected involving {target!r}')
+        exit(1)
     rule = rules[target]
     latency += rule.latency
     if latency <= rule.priority:
@@ -372,10 +375,12 @@ def propagate_latencies(target, latency):
     rule.priority = latency # update this rule's latency
 
     # Recursively handle the dependencies, including order-only deps
+    _active.add(target)
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     for dep in itertools.chain(deps, rule.order_only_inputs):
         if dep in rules:
-            propagate_latencies(dep, latency)
+            propagate_latencies(dep, latency, _active)
+    _active.remove(target)
 
 def drain_event_queue():
     while True:
@@ -418,7 +423,7 @@ def main():
         if target not in rules:
             print(f'ERROR: no rule to build target {target!r}')
             exit(1)
-        propagate_latencies(target, 0)
+        propagate_latencies(target, 0, set())
 
     # Clean up stale targets from previous builds that no longer have rules; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
