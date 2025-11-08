@@ -318,11 +318,11 @@ def validate_rules_ast(tree, path):
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)):
             raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
 
-def parse_rules_py(ctx, args, pathname, visited):
+def parse_rules_py(ctx, verbose, pathname, visited):
     if pathname in visited:
         return
     visited.add(pathname)
-    if args.verbose:
+    if verbose:
         print(f'Parsing {pathname!r}...')
 
     with open(pathname, encoding='utf-8') as f:
@@ -347,7 +347,7 @@ def parse_rules_py(ctx, args, pathname, visited):
                     make_db[dir][target] = signature
     if hasattr(rules_py_module, 'submakes'):
         for f in rules_py_module.submakes():
-            parse_rules_py(ctx, args, normpath(joinpath(dir, f)), visited)
+            parse_rules_py(ctx, verbose, normpath(joinpath(dir, f)), visited)
     ctx.cwd = dir
     if hasattr(rules_py_module, 'rules'):
         rules_py_module.rules(ctx)
@@ -406,7 +406,7 @@ def main():
     ctx = BuildContext()
     visited = set()
     for f in args.files:
-        parse_rules_py(ctx, args, normpath(joinpath(cwd, f)), visited)
+        parse_rules_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
     for target in args.targets:
         if target not in rules:
             print(f'ERROR: no rule to build target {target!r}')
