@@ -348,8 +348,8 @@ def parse_rules_py(ctx, verbose, pathname, visited):
     if hasattr(rules_py_module, 'submakes'):
         for f in rules_py_module.submakes():
             parse_rules_py(ctx, verbose, normpath(joinpath(dir, f)), visited)
-    ctx.cwd = dir
     if hasattr(rules_py_module, 'rules'):
+        ctx.cwd = dir
         rules_py_module.rules(ctx)
 
 def propagate_latencies(target, latency, _active):
