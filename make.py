@@ -243,7 +243,7 @@ def build(target, args, visited, enqueued, completed):
     depfile_deps = []
     if rule.depfile and os.path.exists(rule.depfile):
         with popen_lock:
-            with open(rule.depfile, 'r') as f:
+            with open(rule.depfile) as f:
                 depfile_deps = f.read()
         depfile_deps = depfile_deps.replace('\\\n', '')
         if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
@@ -328,7 +328,7 @@ def parse_rules_py(ctx, args, pathname, visited):
     if args.verbose:
         print(f'Parsing {pathname!r}...')
 
-    with open(pathname, 'r', encoding='utf-8') as f:
+    with open(pathname, encoding='utf-8') as f:
         source = f.read()
     tree = ast.parse(source, filename=pathname)
     validate_rules_ast(tree, pathname)
