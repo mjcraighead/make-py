@@ -258,26 +258,26 @@ def build(target, args, visited, enqueued, completed):
             any_errors = True
             exit(1)
 
-    # Parse the depfile, if present
-    depfile_deps = []
-    if rule.depfile and os.path.exists(rule.depfile):
-        with popen_lock:
-            with open(rule.depfile) as f:
-                depfile_deps = f.read()
-        depfile_deps = depfile_deps.replace('\\\n', '')
-        if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
-            depfile_deps = shlex.split(depfile_deps)[1:]
-        else:
-            depfile_deps = depfile_deps.split()[1:]
-        depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
-
     # Do all targets exist, and are all of them at least as new as every single dep?
     target_timestamp = min(get_timestamp_if_exists(t) for t in rule.targets) # oldest target timestamp, or -1.0 if any target is nonexistent
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
-        # Do all depfile_deps exist, and are all targets at least as new as every single depfile_dep?
-        if all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
-            # Is the rule's signature identical to the last time we ran it?
-            if all(make_db[rule.cwd].get(t) == rule.signature() for t in rule.targets):
+        # Is the rule's signature identical to the last time we ran it?
+        if all(make_db[rule.cwd].get(t) == rule.signature() for t in rule.targets):
+            # Parse the depfile, if present
+            depfile_deps = []
+            if rule.depfile and os.path.exists(rule.depfile):
+                with popen_lock:
+                    with open(rule.depfile) as f:
+                        depfile_deps = f.read()
+                depfile_deps = depfile_deps.replace('\\\n', '')
+                if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
+                    depfile_deps = shlex.split(depfile_deps)[1:]
+                else:
+                    depfile_deps = depfile_deps.split()[1:]
+                depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
+
+            # Do all depfile_deps exist, and are all targets at least as new as every single depfile_dep?
+            if all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
                 completed.update(rule.targets)
                 return # skip the build
 
