@@ -246,6 +246,18 @@ def build(target, args, visited, enqueued, completed):
     if any(dep not in completed for dep in itertools.chain(deps, rule.order_only_inputs)):
         return
 
+    # Error if any of the deps does not exist -- they should always exist by this point
+    dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
+    for (dep, dep_timestamp) in zip(deps, dep_timestamps):
+        if dep_timestamp < 0:
+            error_message = 'ERROR: dependency %r of %s is nonexistent\n' % (dep, ' '.join(repr(t) for t in rule.targets))
+            if show_progress_line:
+                error_message = '\r%s\r%s' % (' ' * usable_columns, error_message)
+            stdout_write(error_message)
+            global any_errors
+            any_errors = True
+            exit(1)
+
     # Parse the depfile, if present
     depfile_deps = []
     if rule.depfile and os.path.exists(rule.depfile):
@@ -261,18 +273,8 @@ def build(target, args, visited, enqueued, completed):
 
     # Don't build if already up to date
     # Slightly different rules for regular deps vs. depfile_deps -- always rebuild when a depfile_dep is nonexistent,
-    # whereas we want to fail with an error when a regular dep is nonexistent
+    # whereas we fail with an error (above) when a regular dep is nonexistent
     target_timestamp = min(get_timestamp_if_exists(t) for t in rule.targets)
-    dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
-    for (dep, dep_timestamp) in zip(deps, dep_timestamps):
-        if dep_timestamp < 0:
-            error_message = 'ERROR: dependency %r of %s is nonexistent\n' % (dep, ' '.join(repr(t) for t in rule.targets))
-            if show_progress_line:
-                error_message = '\r%s\r%s' % (' ' * usable_columns, error_message)
-            stdout_write(error_message)
-            global any_errors
-            any_errors = True
-            exit(1)
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
         if all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
             if all(make_db[rule.cwd].get(t) == rule.signature() for t in rule.targets):
