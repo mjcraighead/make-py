@@ -250,7 +250,7 @@ def build(target, args, visited, enqueued, completed):
     dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
     for (dep, dep_timestamp) in zip(deps, dep_timestamps):
         if dep_timestamp < 0:
-            error_message = 'ERROR: dependency %r of %s is nonexistent\n' % (dep, ' '.join(repr(t) for t in rule.targets))
+            error_message = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in rule.targets)} is nonexistent\n"
             if show_progress_line:
                 error_message = '\r%s\r%s' % (' ' * usable_columns, error_message)
             stdout_write(error_message)
