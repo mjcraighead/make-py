@@ -185,7 +185,7 @@ class Rule:
     # order_only_inputs, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
     def signature(self):
         info = (self.targets, self.deps, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
-        return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest()
+        return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
 
 class BuildContext:
     def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
