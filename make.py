@@ -52,17 +52,6 @@ except OSError:
     usable_columns = None # stdout is not attached to a terminal
 show_progress_line = usable_columns is not None
 
-# On Windows, if one thread calls subprocess.Popen while another thread has a file handle from open()
-# open, the file handle will be incorrectly and unintentionally inherited by the child process.  This
-# leads to really strange file locking errors.  This problem has never existed on Unix, and was probably
-# fixed on Windows too by: https://peps.python.org/pep-0446/  Replace with a null lock for now and give
-# it extensive soak time before removing.
-class NullLock:
-    def __enter__(self): pass
-    def __exit__(self, *args): pass
-popen_lock = NullLock()
-#popen_lock = threading.Lock()
-
 def stdout_write(x):
     sys.stdout.write(x)
     sys.stdout.flush() # always flush log writes immediately
@@ -93,13 +82,14 @@ else:
 def execute(rule, verbose):
     # Run command, capture/filter its output, and get its exit code.
     # XXX Do we want to add an additional check that all the targets must exist?
-    with popen_lock:
-        try:
-            p = subprocess.Popen(rule.cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        except Exception as e:
-            p = None
-            out = str(e)
-            code = 1
+    try:
+        # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
+        # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
+        p = subprocess.Popen(rule.cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    except Exception as e:
+        p = None
+        out = str(e)
+        code = 1
     if p is not None:
         out = p.stdout.read().decode().strip() # XXX What encoding should we use here??  This assumes UTF-8
         code = p.wait()
@@ -115,13 +105,12 @@ def execute(rule, verbose):
                     deps.add(dep)
             else:
                 new_out.append(line)
-        with popen_lock:
-            with open(rule.depfile, 'w') as f:
-                assert len(rule.targets) == 1
-                f.write(f'{rule.targets[0]}: \\\n')
-                for dep in sorted(deps):
-                    f.write(f'  {dep} \\\n')
-                f.write('\n')
+        with open(rule.depfile, 'w') as f:
+            assert len(rule.targets) == 1
+            f.write(f'{rule.targets[0]}: \\\n')
+            for dep in sorted(deps):
+                f.write(f'  {dep} \\\n')
+            f.write('\n')
 
         # In addition to filtering out the /showIncludes messages, filter the one remaining
         # line of output where it just prints the source file name
@@ -220,9 +209,8 @@ def schedule(target, visited, enqueued, completed):
             depfile_deps = []
             if rule.depfile:
                 try:
-                    with popen_lock:
-                        with open(rule.depfile) as f:
-                            depfile_deps = f.read()
+                    with open(rule.depfile) as f:
+                        depfile_deps = f.read()
                     depfile_deps = depfile_deps.replace('\\\n', '')
                     if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
                         depfile_deps = shlex.split(depfile_deps)[1:]
