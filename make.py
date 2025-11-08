@@ -271,15 +271,15 @@ def build(target, args, visited, enqueued, completed):
             depfile_deps = depfile_deps.split()[1:]
         depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
 
-    # Don't build if already up to date
-    # Slightly different rules for regular deps vs. depfile_deps -- always rebuild when a depfile_dep is nonexistent,
-    # whereas we fail with an error (above) when a regular dep is nonexistent
-    target_timestamp = min(get_timestamp_if_exists(t) for t in rule.targets)
+    # Do all targets exist, and are all of them at least as new as every single dep?
+    target_timestamp = min(get_timestamp_if_exists(t) for t in rule.targets) # oldest target timestamp, or -1.0 if any target is nonexistent
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
+        # Do all depfile_deps exist, and are all targets at least as new as every single depfile_dep?
         if all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
+            # Is the rule's signature identical to the last time we ran it?
             if all(make_db[rule.cwd].get(t) == rule.signature() for t in rule.targets):
-                completed.add(target) # XXX should probably be completed.update(rule.targets)
-                return
+                completed.update(rule.targets)
+                return # skip the build
 
     # Ensure targets' parent directories exist
     for t in rule.targets:
