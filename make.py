@@ -262,7 +262,8 @@ def build(target, args, visited, enqueued, completed):
     target_timestamp = min(get_timestamp_if_exists(t) for t in rule.targets) # oldest target timestamp, or -1.0 if any target is nonexistent
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
         # Is the rule's signature identical to the last time we ran it?
-        if all(make_db[rule.cwd].get(t) == rule.signature() for t in rule.targets):
+        signature = rule.signature()
+        if all(make_db[rule.cwd].get(t) == signature for t in rule.targets):
             # Parse the depfile, if present
             depfile_deps = []
             if rule.depfile and os.path.exists(rule.depfile):
