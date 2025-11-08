@@ -308,13 +308,13 @@ class BuilderThread(threading.Thread):
                 run_cmd(rule, self.args)
             event_queue.put(('finish', rule))
 
-# Reject disallowed constructs in rules.py
+# Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
 def validate_rules_ast(tree, path):
     BANNED = (
-        ast.While,
+        ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
         ast.ImportFrom, # XXX ast.Import temporarily allowed here as a transitional aid for now
         ast.With, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith,
-        ast.Global, ast.Nonlocal, ast.Lambda, ast.NamedExpr, ast.ClassDef,
+        ast.Global, ast.Nonlocal, ast.NamedExpr, ast.ClassDef,
         ast.Try, ast.Raise, ast.Yield, ast.YieldFrom, ast.Await,
         ast.Delete,
     )
