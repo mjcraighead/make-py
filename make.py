@@ -90,7 +90,7 @@ else:
     def joinpath(cwd, path):
         return path if path[0] == '/' else f'{cwd}/{path}'
 
-def run_cmd(rule, args):
+def run_cmd(rule, verbose):
     # Run command, capture/filter its output, and get its exit code.
     # XXX Do we want to add an additional check that all the targets must exist?
     with popen_lock:
@@ -137,7 +137,7 @@ def run_cmd(rule, args):
     if show_progress_line: # need to precede "Built [...]" with erasing the current progress indicator
         built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
-    if args.verbose or code:
+    if verbose or code:
         if os.name == 'nt':
             quoted_cmd = subprocess.list2cmdline(rule.cmd)
         else:
@@ -163,9 +163,9 @@ def run_cmd(rule, args):
     return True
 
 class BuilderThread(threading.Thread):
-    def __init__(self, args):
+    def __init__(self, verbose):
         super().__init__()
-        self.args = args
+        self.verbose = verbose
 
     def run(self):
         while not any_errors:
@@ -174,7 +174,7 @@ class BuilderThread(threading.Thread):
                 break
             if rule.cmd is not None:
                 event_queue.put(('start', rule))
-                run_cmd(rule, self.args)
+                run_cmd(rule, self.verbose)
             event_queue.put(('finish', rule))
 
 class Rule:
@@ -441,7 +441,7 @@ def main():
                 del db[target]
 
     # Create and start builder threads
-    threads = [BuilderThread(args) for i in range(args.jobs)]
+    threads = [BuilderThread(args.verbose) for i in range(args.jobs)]
     for t in threads:
         t.daemon = True # XXX this should probably be removed, but make sure Ctrl-C handling is correct
         t.start()
