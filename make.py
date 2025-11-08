@@ -365,8 +365,6 @@ def parse_rules_py(ctx, args, pathname, visited):
         rules_py_module.rules(ctx)
 
 def propagate_latencies(target, latency):
-    if target not in rules:
-        return
     rule = rules[target]
     latency += rule.latency
     if latency <= rule.priority:
@@ -376,7 +374,8 @@ def propagate_latencies(target, latency):
     # Recursively handle the dependencies, including order-only deps
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     for dep in itertools.chain(deps, rule.order_only_inputs):
-        propagate_latencies(dep, latency)
+        if dep in rules:
+            propagate_latencies(dep, latency)
 
 def drain_event_queue():
     while True:
