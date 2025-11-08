@@ -276,11 +276,9 @@ def build(target, args, visited, enqueued, completed):
                 completed.add(target) # XXX should probably be completed.update(rule.targets)
                 return
 
-    # Create the directories that the targets are going to live in, if they don't already exist
+    # Ensure targets' parent directories exist
     for t in rule.targets:
-        target_dir = os.path.dirname(t)
-        if not os.path.exists(target_dir):
-            os.makedirs(target_dir)
+        os.makedirs(os.path.dirname(t), exist_ok=True)
 
     # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
     task_queue.put((-rule.priority, next(priority_queue_counter), rule))
