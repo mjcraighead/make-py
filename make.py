@@ -238,8 +238,15 @@ def build(target, args, visited, enqueued, completed):
     if target in enqueued:
         return
 
-    # Recursively handle the dependencies, including depfile dependencies and order-only deps
+    # Recurse into dependencies and order-only deps and wait for them to complete
+    # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous build
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
+    for dep in itertools.chain(deps, rule.order_only_inputs):
+        build(dep, args, visited, enqueued, completed)
+    if any(dep not in completed for dep in itertools.chain(deps, rule.order_only_inputs)):
+        return
+
+    # Parse the depfile, if present
     depfile_deps = []
     if rule.depfile and os.path.exists(rule.depfile):
         with popen_lock:
@@ -251,10 +258,6 @@ def build(target, args, visited, enqueued, completed):
         else:
             depfile_deps = depfile_deps.split()[1:]
         depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
-    for dep in itertools.chain(deps, depfile_deps, rule.order_only_inputs):
-        build(dep, args, visited, enqueued, completed)
-    if any(dep not in completed for dep in itertools.chain(deps, depfile_deps, rule.order_only_inputs)):
-        return
 
     # Don't build if already up to date
     # Slightly different rules for regular deps vs. depfile_deps -- always rebuild when a depfile_dep is nonexistent,
