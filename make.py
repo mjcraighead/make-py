@@ -436,9 +436,7 @@ def main():
 
     # Do the build, and try to shut down as cleanly as possible if we get a Ctrl-C
     try:
-        enqueued = set()
-        completed = set()
-        building = set()
+        (enqueued, completed, building) = (set(), set(), set())
         while True:
             # Enqueue work to the builders
             visited = set()
@@ -461,10 +459,10 @@ def main():
             if any_errors:
                 break
             if show_progress_line:
-                incomplete_count = sum(1 for x in (visited - completed) if x in rules)
-                if incomplete_count:
-                    progress = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in building))
-                    progress = f'make.py: {incomplete_count} left, building: {progress}'
+                remaining_count = len((visited - completed) & rules.keys())
+                if remaining_count:
+                    names = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in building))
+                    progress = f'make.py: {remaining_count} left, building: {names}'
                 else:
                     progress = ''
                 if len(progress) < usable_columns:
@@ -472,7 +470,7 @@ def main():
                     progress += ' ' * pad # erase old contents
                     progress += '\b' * pad # put cursor back at end of line
                 else:
-                    progress = progress[0:usable_columns]
+                    progress = progress[:usable_columns]
                 stdout_write('\r' + progress)
             if all(target in completed for target in args.targets):
                 break
