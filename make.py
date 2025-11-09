@@ -44,7 +44,7 @@ normpath_cache = {} # XXX Accesses are not threadsafe right now, though this onl
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
 priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when rule priorities are the same
-any_errors = False
+build_failed = False
 
 try:
     usable_columns = os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
@@ -137,8 +137,8 @@ def execute(rule, verbose):
             quoted_cmd = ' '.join(shlex.quote(x) for x in rule.cmd)
         out = f'{quoted_cmd}\n{out}'.rstrip()
     if code:
-        global any_errors
-        any_errors = True
+        global build_failed
+        build_failed = True
         event_queue.put(('log', f'{built_text}{out}\n\n'))
         for t in rule.targets:
             with contextlib.suppress(FileNotFoundError):
@@ -161,7 +161,7 @@ class BuilderThread(threading.Thread):
         self.verbose = verbose
 
     def run(self):
-        while not any_errors:
+        while not build_failed:
             (priority, counter, rule) = task_queue.get()
             if rule is None:
                 break
@@ -194,8 +194,8 @@ def schedule(target, visited, enqueued, completed):
     dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
     for (dep, dep_timestamp) in zip(deps, dep_timestamps):
         if dep_timestamp < 0:
-            global any_errors
-            any_errors = True
+            global build_failed
+            build_failed = True
             msg = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in rule.targets)} is nonexistent"
             if show_progress_line:
                 msg = '\r%s\r%s' % (' ' * usable_columns, msg)
@@ -453,7 +453,7 @@ def main():
                     assert status == 'finish', status
                     building.difference_update(info.targets)
                     completed.update(info.targets)
-            if any_errors:
+            if build_failed:
                 break
             if show_progress_line:
                 remaining_count = len((visited - completed) & rules.keys())
@@ -489,7 +489,7 @@ def main():
                     f.write(f'{target} {signature}\n')
             os.replace(f'{cwd}/_out/make.db.tmp', f'{cwd}/_out/make.db')
 
-    if any_errors:
+    if build_failed:
         exit(1)
 
 if __name__ == '__main__':
