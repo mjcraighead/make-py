@@ -106,12 +106,13 @@ def execute(rule, verbose):
                     deps.add(dep)
             else:
                 new_out.append(line)
-        with open(rule.depfile, 'w') as f:
-            assert len(rule.targets) == 1
+        assert len(rule.targets) == 1, rule.targets
+        with open(f'{rule.depfile}.tmp', 'w') as f:
             f.write(f'{rule.targets[0]}: \\\n')
             for dep in sorted(deps):
                 f.write(f'  {dep} \\\n')
             f.write('\n')
+        os.replace(f'{rule.depfile}.tmp', rule.depfile)
 
         # In addition to filtering out the /showIncludes messages, filter the one remaining
         # line of output where it just prints the source file name
