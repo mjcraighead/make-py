@@ -58,7 +58,7 @@ def stdout_write(x):
 
 def die(msg):
     print(msg)
-    sys.exit(1)
+    exit(1)
 
 # Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
