@@ -27,6 +27,7 @@ import importlib.util
 import itertools
 import os
 import pickle
+import platform
 import queue
 import re
 import shlex
@@ -261,6 +262,36 @@ class Rule:
         info = (self.targets, self.deps, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
 
+class FrozenNamespace:
+    __slots__ = ('__dict__',) # allow exactly one slot: the instance dict itself
+    def __init__(self, **kwargs):
+        object.__setattr__(self, '__dict__', dict(kwargs))
+    def __setattr__(self, k, v):
+        raise AttributeError(f'{self.__class__.__name__} is read-only')
+    __delattr__ = __setattr__
+    def __repr__(self):
+        items = ', '.join(f'{k}={v!r}' for k, v in self.__dict__.items())
+        return f'{self.__class__.__name__}({items})'
+
+# make.py host detection: runs on any plausible system in 2025 with Python 3.6+.
+# ctx.host.os = OS ABI family (kernel/loader/libc), ctx.host.arch = CPU ISA family; together define the host ABI.
+os_map = {
+    'Windows': 'windows', 'Linux': 'linux', 'Darwin': 'darwin',
+    'FreeBSD': 'freebsd', 'OpenBSD': 'openbsd', 'NetBSD': 'netbsd',
+    'DragonFly': 'dragonflybsd', 'SunOS': 'sunos',
+}
+arch_map = {
+    'AMD64': 'x86_64', 'x86_64': 'x86_64',
+    'x86': 'x86_32', 'i686': 'x86_32',
+    'ARM64': 'aarch64', 'aarch64': 'aarch64', 'arm64': 'aarch64',
+    'ppc64le': 'ppc64le', 'riscv64': 'riscv64', 's390x': 's390x',
+}
+def detect_host():
+    (system, machine) = (platform.system(), platform.machine())
+    if system not in os_map or machine not in arch_map:
+        die(f'ERROR: host detection failed: system={system!r} machine={machine!r}')
+    return FrozenNamespace(os=os_map[system], arch=arch_map[machine])
+
 class BuildContext:
     # Note that the DSL exposes "outputs"/"inputs", but these are remapped to "targets"/"deps" inside the internals of this script for clarity.
     def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
@@ -406,6 +437,7 @@ def main():
 
     # Set up rule DB, reading in make.db files as we go
     ctx = BuildContext()
+    ctx.host = detect_host()
     visited = set()
     for f in args.files:
         parse_rules_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
