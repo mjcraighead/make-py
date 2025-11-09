@@ -21,6 +21,7 @@
 import argparse
 import ast
 import contextlib
+import functools
 import hashlib
 import importlib.util
 import itertools
@@ -40,7 +41,6 @@ sys.dont_write_bytecode = True
 
 rules = {}
 make_db = {}
-normpath_cache = {} # XXX Accesses are not threadsafe right now, though this only matters for msvc_show_includes
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
 priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when rule priorities are the same
@@ -67,19 +67,18 @@ def get_timestamp_if_exists(path):
     except FileNotFoundError:
         return -1.0 # sentinel value: file does not exist
 
-def normpath(path):
-    if path in normpath_cache:
-        return normpath_cache[path]
-    ret = os.path.normpath(path)
-    if os.name == 'nt':
-        ret = ret.lower().replace('\\', '/')
-    normpath_cache[path] = ret
-    return ret
-
 if os.name == 'nt': # evaluate this condition only once, rather than per call, for performance
+    @functools.lru_cache(maxsize=None)
+    def normpath(path):
+        return os.path.normpath(path).lower().replace('\\', '/')
+
     def joinpath(cwd, path):
         return path if (path[0] == '/' or path[1] == ':') else f'{cwd}/{path}'
 else:
+    @functools.lru_cache(maxsize=None)
+    def normpath(path):
+        return os.path.normpath(path)
+
     def joinpath(cwd, path):
         return path if path[0] == '/' else f'{cwd}/{path}'
 
