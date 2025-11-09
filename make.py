@@ -174,7 +174,7 @@ def schedule(target, visited, enqueued, completed):
         return
     rule = rules[target]
     visited.update(rule.targets)
-    if target in enqueued:
+    if rule in enqueued:
         return
 
     # Recurse into dependencies and order-only deps and wait for them to complete
@@ -240,7 +240,7 @@ def schedule(target, visited, enqueued, completed):
 
     # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
     task_queue.put((-rule.priority, next(priority_queue_counter), rule))
-    enqueued.update(rule.targets)
+    enqueued.add(rule)
 
 class Rule:
     def __init__(self, targets, deps, cwd, cmd, depfile, order_only_deps, msvc_show_includes, output_exclude, latency):
