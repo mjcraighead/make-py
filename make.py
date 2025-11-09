@@ -483,17 +483,20 @@ def main():
                 if status == 'log':
                     stdout_write(payload)
                 elif status == 'start':
-                    building.update(payload.targets)
+                    building.add(payload)
                 else:
                     assert status == 'finish', status
-                    building.difference_update(payload.targets)
+                    building.discard(payload)
                     completed.update(payload.targets)
             if build_failed:
                 break
             if show_progress_line:
                 remaining_count = len((visited - completed) & rules.keys())
                 if remaining_count:
-                    names = ' '.join(sorted(x.rsplit('/', 1)[-1] for x in building))
+                    def format_rule_targets(rule):
+                        targets = [t.rsplit('/', 1)[-1] for t in rule.targets]
+                        return targets[0] if len(targets) == 1 else f"[{' '.join(sorted(targets))}]"
+                    names = ' '.join(sorted(format_rule_targets(rule) for rule in building))
                     progress = f'make.py: {remaining_count} left, building: {names}'
                 else:
                     progress = ''
