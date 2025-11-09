@@ -185,9 +185,9 @@ def schedule(target, visited, enqueued, completed):
     # Recurse into dependencies and order-only deps and wait for them to complete
     # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous build
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
-    for dep in itertools.chain(deps, rule.order_only_inputs):
+    for dep in itertools.chain(deps, rule.order_only_deps):
         schedule(dep, visited, enqueued, completed)
-    if any(dep not in completed for dep in itertools.chain(deps, rule.order_only_inputs)):
+    if any(dep not in completed for dep in itertools.chain(deps, rule.order_only_deps)):
         return
 
     # Error if any of the deps does not exist -- they should always exist by this point
@@ -243,13 +243,13 @@ def schedule(target, visited, enqueued, completed):
     enqueued.update(rule.targets)
 
 class Rule:
-    def __init__(self, targets, deps, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency):
+    def __init__(self, targets, deps, cwd, cmd, depfile, order_only_deps, msvc_show_includes, output_exclude, latency):
         self.targets = targets
         self.deps = deps
         self.cwd = cwd
         self.cmd = cmd
         self.depfile = depfile
-        self.order_only_inputs = order_only_inputs
+        self.order_only_deps = order_only_deps
         self.msvc_show_includes = msvc_show_includes
         self.output_exclude = output_exclude
         self.latency = latency
@@ -363,7 +363,7 @@ def propagate_latencies(target, latency, _active):
     # Recursively handle the dependencies, including order-only deps
     _active.add(target)
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
-    for dep in itertools.chain(deps, rule.order_only_inputs):
+    for dep in itertools.chain(deps, rule.order_only_deps):
         if dep in rules:
             propagate_latencies(dep, latency, _active)
     _active.remove(target)
