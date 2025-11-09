@@ -35,7 +35,6 @@ import shutil
 import subprocess
 import sys
 import threading
-import time
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
