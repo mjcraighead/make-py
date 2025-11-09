@@ -56,6 +56,10 @@ def stdout_write(x):
     sys.stdout.write(x)
     sys.stdout.flush() # always flush log writes immediately
 
+def die(msg):
+    print(msg)
+    sys.exit(1)
+
 # Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
     try:
@@ -190,13 +194,12 @@ def schedule(target, visited, enqueued, completed):
     dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
     for (dep, dep_timestamp) in zip(deps, dep_timestamps):
         if dep_timestamp < 0:
-            error_message = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in rule.targets)} is nonexistent\n"
-            if show_progress_line:
-                error_message = '\r%s\r%s' % (' ' * usable_columns, error_message)
-            stdout_write(error_message)
             global any_errors
             any_errors = True
-            exit(1)
+            msg = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in rule.targets)} is nonexistent"
+            if show_progress_line:
+                msg = '\r%s\r%s' % (' ' * usable_columns, msg)
+            die(msg)
 
     # Do all targets exist, and are all of them at least as new as every single dep?
     local_make_db = make_db[rule.cwd]
@@ -292,8 +295,7 @@ class BuildContext:
         rule = Rule(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for t in outputs:
             if t in rules:
-                print(f'ERROR: multiple ways to build {t!r}')
-                exit(1)
+                die(f'ERROR: multiple ways to build {t!r}')
             rules[t] = rule
 
 # Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
@@ -351,8 +353,7 @@ def parse_rules_py(ctx, verbose, pathname, visited):
 
 def propagate_latencies(target, latency, _active):
     if target in _active:
-        print(f'ERROR: cycle detected involving {target!r}')
-        exit(1)
+        die(f'ERROR: cycle detected involving {target!r}')
     rule = rules[target]
     latency += rule.latency
     if latency <= rule.priority:
@@ -406,8 +407,7 @@ def main():
         parse_rules_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
     for target in args.targets:
         if target not in rules:
-            print(f'ERROR: no rule to build target {target!r}')
-            exit(1)
+            die(f'ERROR: no rule to build target {target!r}')
         propagate_latencies(target, 0, set())
 
     # Clean up stale targets from previous builds that no longer have rules; also do an explicitly requested clean
