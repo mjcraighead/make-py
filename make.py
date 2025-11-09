@@ -338,17 +338,17 @@ def parse_rules_py(ctx, verbose, pathname, visited):
     rules_py_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(rules_py_module)
 
-    dir = os.path.dirname(pathname)
-    if dir not in make_db:
-        make_db[dir] = {}
+    dirname = os.path.dirname(pathname)
+    if dirname not in make_db:
+        make_db[dirname] = {}
         with contextlib.suppress(FileNotFoundError):
-            with open(f'{dir}/_out/make.db') as f:
-                make_db[dir] = dict(line.rstrip().rsplit(' ', 1) for line in f)
+            with open(f'{dirname}/_out/make.db') as f:
+                make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in f)
     if hasattr(rules_py_module, 'submakes'):
         for f in rules_py_module.submakes():
-            parse_rules_py(ctx, verbose, normpath(joinpath(dir, f)), visited)
+            parse_rules_py(ctx, verbose, normpath(joinpath(dirname, f)), visited)
     if hasattr(rules_py_module, 'rules'):
-        ctx.cwd = dir
+        ctx.cwd = dirname
         rules_py_module.rules(ctx)
 
 def propagate_latencies(target, latency, _active):
@@ -413,10 +413,10 @@ def main():
     # Clean up stale targets from previous builds that no longer have rules; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
         if args.clean:
-            dir = f'{cwd}/_out'
-            if os.path.exists(dir):
-                print(f'Cleaning {dir!r}...')
-                shutil.rmtree(dir)
+            dirname = f'{cwd}/_out'
+            if os.path.exists(dirname):
+                print(f'Cleaning {dirname!r}...')
+                shutil.rmtree(dirname)
             db.clear()
         for (target, signature) in list(db.items()):
             if target not in rules:
