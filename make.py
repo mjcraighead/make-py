@@ -58,7 +58,7 @@ def stdout_write(x):
 
 def die(msg):
     print(msg)
-    exit(1)
+    sys.exit(1)
 
 # Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
@@ -257,12 +257,13 @@ class Rule:
         self.latency = latency
         self.priority = 0
 
-    # order_only_inputs, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
+    # order_only_deps, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
     def signature(self):
         info = (self.targets, self.deps, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
 
 class BuildContext:
+    # Note that the DSL exposes "outputs"/"inputs", but these are remapped to "targets"/"deps" inside the internals of this script for clarity.
     def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
         if not isinstance(outputs, list):
@@ -496,7 +497,7 @@ def main():
             os.replace(f'{cwd}/_out/make.db.tmp', f'{cwd}/_out/make.db')
 
     if build_failed:
-        exit(1)
+        sys.exit(1)
 
 if __name__ == '__main__':
     main()
