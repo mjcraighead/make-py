@@ -89,14 +89,12 @@ def execute(rule, verbose):
     try:
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
         # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
-        p = subprocess.Popen(rule.cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        result = subprocess.run(rule.cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        out = result.stdout.decode().strip() # XXX What encoding should we use here??  This assumes UTF-8
+        code = result.returncode
     except Exception as e:
-        p = None
         out = str(e)
         code = 1
-    if p is not None:
-        out = p.stdout.read().decode().strip() # XXX What encoding should we use here??  This assumes UTF-8
-        code = p.wait()
     if rule.msvc_show_includes:
         deps = set()
         r = re.compile('^Note: including file:\\s*(.*)$')
