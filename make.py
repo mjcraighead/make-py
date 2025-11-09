@@ -90,7 +90,7 @@ def execute(rule, verbose):
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
         # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
         result = subprocess.run(rule.cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        out = result.stdout.decode().strip() # XXX What encoding should we use here??  This assumes UTF-8
+        out = result.stdout.decode('utf-8', 'replace').strip() # Assumes UTF-8, but robust if not -- XXX consider changing out to bytes
         code = result.returncode
     except Exception as e:
         out = str(e)
