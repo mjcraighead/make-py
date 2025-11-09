@@ -172,10 +172,6 @@ class BuilderThread(threading.Thread):
 def schedule(target, visited, enqueued, completed):
     if target in visited or target in completed:
         return
-    if target not in rules:
-        visited.add(target)
-        completed.add(target)
-        return
     rule = rules[target]
     visited.update(rule.targets)
     if target in enqueued:
@@ -185,7 +181,11 @@ def schedule(target, visited, enqueued, completed):
     # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous build
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     for dep in itertools.chain(deps, rule.order_only_deps):
-        schedule(dep, visited, enqueued, completed)
+        if dep in rules:
+            schedule(dep, visited, enqueued, completed)
+        else:
+            visited.add(dep)
+            completed.add(dep)
     if any(dep not in completed for dep in itertools.chain(deps, rule.order_only_deps)):
         return
 
