@@ -444,15 +444,15 @@ def main():
 
             # Handle events from builder threads, then show progress update and exit if done
             # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
-            for (status, info) in drain_event_queue():
+            for (status, payload) in drain_event_queue():
                 if status == 'log':
-                    stdout_write(info)
+                    stdout_write(payload)
                 elif status == 'start':
-                    building.update(info.targets)
+                    building.update(payload.targets)
                 else:
                     assert status == 'finish', status
-                    building.difference_update(info.targets)
-                    completed.update(info.targets)
+                    building.difference_update(payload.targets)
+                    completed.update(payload.targets)
             if build_failed:
                 break
             if show_progress_line:
