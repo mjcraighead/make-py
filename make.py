@@ -39,7 +39,7 @@ import time
 sys.dont_write_bytecode = True
 
 rules = {}
-make_db = {} # XXX Accesses are not threadsafe right now
+make_db = {}
 normpath_cache = {} # XXX Accesses are not threadsafe right now, though this only matters for msvc_show_includes
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
@@ -148,6 +148,7 @@ def execute(rule, verbose):
     local_make_db = make_db[rule.cwd]
     signature = rule.signature()
     for t in rule.targets:
+        assert t in local_make_db, t # make sure slot is already allocated
         local_make_db[t] = signature
     if out:
         event_queue.put(('log', f'{built_text}{out}\n\n'))
@@ -232,7 +233,8 @@ def schedule(target, visited, enqueued, completed):
     for t in rule.targets:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(t)
-        local_make_db.pop(t, None) # XXX Probably better to store a None tombstone here for lock-free updates
+        assert t in local_make_db, t # make sure slot is already allocated
+        local_make_db[t] = None
 
     # Ensure targets' parent directories exist
     for t in rule.targets:
@@ -297,6 +299,8 @@ class BuildContext:
             if t in rules:
                 die(f'ERROR: multiple ways to build {t!r}')
             rules[t] = rule
+            if t not in make_db[cwd]:
+                make_db[cwd][t] = None # preallocate a slot for every possible target in the make_db before we launch the BuilderThreads
 
 # Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
 def validate_rules_ast(tree, path):
@@ -417,9 +421,10 @@ def main():
             if os.path.exists(dirname):
                 print(f'Cleaning {dirname!r}...')
                 shutil.rmtree(dirname)
-            db.clear()
+            for t in db:
+                db[t] = None
         for (target, signature) in list(db.items()):
-            if target not in rules:
+            if target not in rules and signature is not None:
                 with contextlib.suppress(FileNotFoundError):
                     os.unlink(target)
                     print(f'Deleted stale target {target!r}.')
@@ -486,7 +491,8 @@ def main():
                 os.mkdir(f'{cwd}/_out')
             with open(f'{cwd}/_out/make.db.tmp', 'w') as f:
                 for (target, signature) in db.items():
-                    f.write(f'{target} {signature}\n')
+                    if signature is not None:
+                        f.write(f'{target} {signature}\n')
             os.replace(f'{cwd}/_out/make.db.tmp', f'{cwd}/_out/make.db')
 
     if build_failed:
