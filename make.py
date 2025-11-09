@@ -106,9 +106,8 @@ def execute(rule, verbose):
                     deps.add(dep)
             else:
                 new_out.append(line)
-        assert len(rule.targets) == 1, rule.targets
         with open(f'{rule.depfile}.tmp', 'w') as f:
-            f.write(f'{rule.targets[0]}: \\\n')
+            f.write(f'{rule.targets[0]}: \\\n') # we checked for only 1 target at rule create time
             for dep in sorted(deps):
                 f.write(f'  {dep} \\\n')
             f.write('\n')
@@ -322,6 +321,8 @@ class BuildContext:
         assert isinstance(order_only_inputs, list)
         order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
         assert output_exclude is None or isinstance(output_exclude, str)
+        if msvc_show_includes:
+            assert len(outputs) == 1, outputs # we only support 1 target for msvc_show_includes
 
         rule = Rule(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for t in outputs:
