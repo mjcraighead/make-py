@@ -73,7 +73,7 @@ if os.name == 'nt': # evaluate this condition only once, rather than per call, f
         return os.path.normpath(path).lower().replace('\\', '/')
 
     def joinpath(cwd, path):
-        return path if (path[0] == '/' or path[1] == ':') else f'{cwd}/{path}'
+        return path if (path[0] == '/' or path[1:2] == ':') else f'{cwd}/{path}'
 else:
     @functools.lru_cache(maxsize=None)
     def normpath(path):
