@@ -35,7 +35,7 @@ while staying **small enough to understand**.
 - Order-only dependencies for generated headers.
 - Multi-target rules (one command generating multiple outputs).
 - Automatic creation of output directories.
-- Works on **Windows** (both Win32 and WSL), **Linux**, and **macOS**.
+- Works on **Windows** (both Win32 and WSL), **Linux**, **macOS**, and other Unix systems (FreeBSD, etc.).
 
 ### ⚙️ Lightweight by design
 - Entire tool lives in a **single Python file (~500 lines)**.
@@ -49,8 +49,8 @@ constructs that could hang or make builds non-deterministic or unsafe to paralle
 For example, `while` and `lambda` are forbidden to ensure all programs terminate, and
 `async` is disallowed as unnecessary in this domain.
 
-Today, these restrictions are light - you can use nearly all normal Python, including imports - but over time,
-the checks will tighten to define a well-specified, Starlark-like subset.
+Today, these restrictions are light - you can use nearly all normal Python, with limited imports (`os`, `platform`
+only) - but over time, the checks will tighten to define a well-specified, Starlark-like subset.
 
 The goal is to keep Python's flexibility and readability while gaining the predictability and analyzability of
 a structured build DSL. In practice, you write ordinary Python, and make.py keeps your build definitions clean,
