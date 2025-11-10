@@ -106,11 +106,9 @@ def execute(rule, verbose):
                     deps.add(dep)
             else:
                 new_out.append(line)
+        parts = [f'{rule.targets[0]}:'] + sorted(deps) # we checked for only 1 target at rule create time
         with open(f'{rule.depfile}.tmp', 'w') as f:
-            f.write(f'{rule.targets[0]}: \\\n') # we checked for only 1 target at rule create time
-            for dep in sorted(deps):
-                f.write(f'  {dep} \\\n')
-            f.write('\n')
+            f.write(' \\\n  '.join(parts) + '\n') # add line continuations and indents for canonical make syntax
         os.replace(f'{rule.depfile}.tmp', rule.depfile)
 
         # In addition to filtering out the /showIncludes messages, filter the one remaining
