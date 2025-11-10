@@ -95,6 +95,7 @@ def execute(rule, verbose):
         out = str(e)
         code = 1
     if rule.msvc_show_includes:
+        # Parse MSVC /showIncludes output, skipping system headers
         r = re.compile(r'^Note: including file:\s*(.*)$')
         (deps, new_out) = (set(), [])
         for line in out.splitlines():
@@ -105,17 +106,13 @@ def execute(rule, verbose):
                     deps.add(dep)
             else:
                 new_out.append(line)
+        out = '' if len(new_out) == 1 else '\n'.join(new_out) # drop lone "source.c" line printed by MSVC
+
+        # Write a make-style depfile listing all included headers
         parts = [f'{rule.targets[0]}:'] + sorted(deps) # we checked for only 1 target at rule create time
         with open(f'{rule.depfile}.tmp', 'w') as f:
-            f.write(' \\\n  '.join(parts) + '\n') # add line continuations and indents for canonical make syntax
+            f.write(' \\\n  '.join(parts) + '\n') # add line continuations and indentation
         os.replace(f'{rule.depfile}.tmp', rule.depfile)
-
-        # In addition to filtering out the /showIncludes messages, filter the one remaining
-        # line of output where it just prints the source file name
-        if len(new_out) == 1:
-            out = ''
-        else:
-            out = '\n'.join(new_out)
     elif rule.output_exclude:
         r = re.compile(rule.output_exclude)
         out = '\n'.join(line for line in out.splitlines() if not r.match(line))
