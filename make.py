@@ -332,9 +332,9 @@ def validate_rules_ast(tree, path):
         ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
         ast.ImportFrom, # XXX ast.Import temporarily allowed here as a transitional aid for now
         ast.With, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith,
-        ast.Global, ast.Nonlocal, ast.NamedExpr, ast.ClassDef,
+        ast.Global, ast.Nonlocal, ast.Delete, ast.ClassDef,
         ast.Try, ast.Raise, ast.Yield, ast.YieldFrom, ast.Await,
-        ast.Delete,
+        getattr(ast, 'NamedExpr', ()), # ast.NamedExpr exists only in 3.8+
     )
 
     for node in ast.walk(tree):
@@ -345,7 +345,7 @@ def validate_rules_ast(tree, path):
             for alias in node.names:
                 if alias.name not in {'os', 'platform'}:
                     raise SyntaxError(f'Import of {alias.name!r} not allowed (file {path!r}, line {lineno})')
-        if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)):
+        if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
             raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
 
 def parse_rules_py(ctx, verbose, pathname, visited):
