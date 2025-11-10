@@ -96,8 +96,7 @@ def execute(rule, verbose):
         code = 1
     if rule.msvc_show_includes:
         r = re.compile(r'^Note: including file:\s*(.*)$')
-        deps = set()
-        new_out = []
+        (deps, new_out) = (set(), [])
         for line in out.splitlines():
             m = r.match(line)
             if m:
