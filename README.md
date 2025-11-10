@@ -1,12 +1,12 @@
 # make.py - a fast, minimalistic, Python-based build tool
 **make.py** is a lightweight build system written in Python.
 
-Build rules are defined in `rules.py` scripts - ordinary Python files - giving you expressive power, composability,
+Build rules are defined in `rules.py` scripts: ordinary Python files that give you expressive power, composability,
 and simplicity all in one place.
 
 Unlike many build tools that invent their own DSLs, make.py lets you write your build logic directly in Python
 (within a controlled subset, see below). The result is a tool that's **fast**, **reliable**, and **pleasant to use**,
-while staying **small enough to understand**.
+but still **small enough to understand**.
 
 ## ✨ Highlights
 
@@ -36,6 +36,7 @@ while staying **small enough to understand**.
 - Multi-target rules (one command generating multiple outputs).
 - Automatic creation of output directories.
 - Works on **Windows** (both Win32 and WSL), **Linux**, **macOS**, and other Unix systems (FreeBSD, etc.).
+- Built-in host detection (`ctx.host`) exposing normalized OS/architecture information for portable rules.
 
 ### ⚙️ Lightweight by design
 - Entire tool lives in a **single Python file (~500 lines)**.
@@ -56,9 +57,9 @@ The goal is to keep Python's flexibility and readability while gaining the predi
 a structured build DSL. In practice, you write ordinary Python, and make.py keeps your build definitions clean,
 reproducible, and future-proof.
 
-## 🚧 Planned / Future Features
+## 🚧 Planned Features
 - Optional SHA-256–based dependency tracking instead of timestamp comparisons.
-- Richer static analysis for rule dependency graphs.
+- Improved diagnostics for invalid rule definitions and dependency cycles.
 - More complete compatibility with other Starlark implementations and .bzl files.
 
 ## 🧾 Requirements
@@ -70,7 +71,10 @@ make.py aims to occupy a unique middle ground:
 - More deterministic and parallel than ad-hoc scripts.
 - Fully inspectable - you can read the whole thing in one sitting and know what your build system is doing.
 
-When your build tool fits in a single file, debugging and trust become much easier.
+It treats builds as hermetic, deterministic processes - a simple, elegant idea that much heavier systems
+tend to obscure beneath layers of machinery that might not be necessary after all.
+
+When your build tool fits in a single file, *debugging* and *trust* become much easier.
 
 ## 📜 License
 MIT License
