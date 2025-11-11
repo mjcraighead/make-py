@@ -44,7 +44,7 @@ make_db = {}
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
 priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when rule priorities are the same
-build_failed = False # global failure flag across all tasks in this run
+any_tasks_failed = False # global failure flag across all tasks in this run
 
 try:
     usable_columns = os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
@@ -128,8 +128,8 @@ def execute(rule, verbose):
             quoted_cmd = ' '.join(shlex.quote(x) for x in rule.cmd)
         out = f'{quoted_cmd}\n{out}'.rstrip()
     if code:
-        global build_failed
-        build_failed = True
+        global any_tasks_failed
+        any_tasks_failed = True
         event_queue.put(('log', f'{built_text}{out}\n\n'))
         for t in rule.targets:
             with contextlib.suppress(FileNotFoundError):
@@ -153,7 +153,7 @@ class WorkerThread(threading.Thread):
         self.verbose = verbose
 
     def run(self):
-        while not build_failed:
+        while not any_tasks_failed:
             (priority, counter, rule) = task_queue.get()
             if rule is None:
                 break
@@ -186,8 +186,8 @@ def schedule(target, visited, enqueued, completed):
     dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
     for (dep, dep_timestamp) in zip(deps, dep_timestamps):
         if dep_timestamp < 0:
-            global build_failed
-            build_failed = True
+            global any_tasks_failed
+            any_tasks_failed = True
             msg = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in rule.targets)} is nonexistent"
             if show_progress_line:
                 msg = '\r%s\r%s' % (' ' * usable_columns, msg)
@@ -480,7 +480,7 @@ def main():
                     assert status == 'finish', status
                     running.discard(payload)
                     completed.update(payload.targets)
-            if build_failed:
+            if any_tasks_failed:
                 break
             if show_progress_line:
                 remaining_count = len((visited - completed) & tasks.keys())
@@ -523,7 +523,7 @@ def main():
                 with contextlib.suppress(FileNotFoundError):
                     os.unlink(f'{cwd}/_out/.make.db')
 
-    if build_failed:
+    if any_tasks_failed:
         sys.exit(1)
 
 if __name__ == '__main__':
