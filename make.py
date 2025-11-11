@@ -84,7 +84,7 @@ else:
 
 def execute(task, verbose):
     # Run command, capture/filter its output, and get its exit code.
-    # XXX Do we want to add an additional check that all the targets must exist?
+    # XXX Do we want to add an additional check that all the outputs must exist?
     try:
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
         # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
@@ -110,14 +110,14 @@ def execute(task, verbose):
 
         # Write a make-style depfile listing all included headers
         tmp_path = f'{task.depfile}.tmp'
-        parts = [f'{task.targets[0]}:'] + sorted(deps) # we checked for only 1 target at task declaration time
+        parts = [f'{task.outputs[0]}:'] + sorted(deps) # we checked for only 1 output at task declaration time
         open(tmp_path, 'w').write(' \\\n  '.join(parts) + '\n') # add line continuations and indentation
         os.replace(tmp_path, task.depfile)
     elif task.output_exclude:
         r = re.compile(task.output_exclude)
         out = '\n'.join(line for line in out.splitlines() if not r.match(line))
 
-    built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in task.targets)
+    built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in task.outputs)
     if show_progress_line: # need to precede "Built [...]" with erasing the current progress indicator
         built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
@@ -131,14 +131,14 @@ def execute(task, verbose):
         global any_tasks_failed
         any_tasks_failed = True
         event_queue.put(('log', f'{built_text}{out}\n\n'))
-        for t in task.targets:
+        for t in task.outputs:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(t)
         return False
 
     local_make_db = make_db[task.cwd]
     signature = task.signature()
-    for t in task.targets:
+    for t in task.outputs:
         assert t in local_make_db, t # make sure slot is already allocated
         local_make_db[t] = signature
     if out:
@@ -166,20 +166,20 @@ def schedule(target, visited, enqueued, completed):
     if target in visited or target in completed:
         return
     task = tasks[target]
-    visited.update(task.targets)
+    visited.update(task.outputs)
     if task in enqueued:
         return
 
     # Recurse into dependencies and order-only deps and wait for them to complete
     # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous run
-    deps = [normpath(joinpath(task.cwd, x)) for x in task.deps]
-    for dep in itertools.chain(deps, task.order_only_deps):
+    deps = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
+    for dep in itertools.chain(deps, task.order_only_inputs):
         if dep in tasks:
             schedule(dep, visited, enqueued, completed)
         else:
             visited.add(dep)
             completed.add(dep)
-    if any(dep not in completed for dep in itertools.chain(deps, task.order_only_deps)):
+    if any(dep not in completed for dep in itertools.chain(deps, task.order_only_inputs)):
         return
 
     # Error if any of the deps does not exist -- they should always exist by this point
@@ -188,45 +188,45 @@ def schedule(target, visited, enqueued, completed):
         if dep_timestamp < 0:
             global any_tasks_failed
             any_tasks_failed = True
-            msg = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in task.targets)} is nonexistent"
+            msg = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in task.outputs)} is nonexistent"
             if show_progress_line:
                 msg = '\r%s\r%s' % (' ' * usable_columns, msg)
             die(msg)
 
-    # Do all targets exist, and are all of them at least as new as every single dep?
+    # Do all outputs exist, and are all of them at least as new as every single input?
     local_make_db = make_db[task.cwd]
-    target_timestamp = min(get_timestamp_if_exists(t) for t in task.targets) # oldest target timestamp, or -1.0 if any target is nonexistent
+    target_timestamp = min(get_timestamp_if_exists(t) for t in task.outputs) # oldest output timestamp, or -1.0 if any output is nonexistent
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
         # Is the task's signature identical to the last time we ran it?
         signature = task.signature()
-        if all(local_make_db.get(t) == signature for t in task.targets):
+        if all(local_make_db.get(t) == signature for t in task.outputs):
             # Parse the depfile, if present
-            depfile_deps = []
+            depfile_inputs = []
             if task.depfile:
                 try:
-                    depfile_deps = open(task.depfile).read().replace('\\\n', '')
-                    if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
-                        depfile_deps = shlex.split(depfile_deps)[1:]
+                    depfile_inputs = open(task.depfile).read().replace('\\\n', '')
+                    if '\\' in depfile_inputs: # shlex.split is slow, don't use it unless we really need it
+                        depfile_inputs = shlex.split(depfile_inputs)[1:]
                     else:
-                        depfile_deps = depfile_deps.split()[1:]
-                    depfile_deps = [normpath(joinpath(task.cwd, x)) for x in depfile_deps]
+                        depfile_inputs = depfile_inputs.split()[1:]
+                    depfile_inputs = [normpath(joinpath(task.cwd, x)) for x in depfile_inputs]
                 except FileNotFoundError:
-                    depfile_deps = None # depfile was expected but missing -- always dirty
+                    depfile_inputs = None # depfile was expected but missing -- always dirty
 
-            # Do all depfile_deps exist, and are all targets at least as new as every single depfile_dep?
-            if depfile_deps is not None and all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
-                completed.update(task.targets)
+            # Do all depfile_inputs exist, and are all outputs at least as new as every single depfile_input?
+            if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_inputs):
+                completed.update(task.outputs)
                 return # skip the task
 
-    # Remove stale targets immediately once this task is marked dirty
-    for t in task.targets:
+    # Remove stale outputs immediately once this task is marked dirty
+    for t in task.outputs:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(t)
         assert t in local_make_db, t # make sure slot is already allocated
         local_make_db[t] = None
 
-    # Ensure targets' parent directories exist
-    for t in task.targets:
+    # Ensure outputs' parent directories exist
+    for t in task.outputs:
         os.makedirs(os.path.dirname(t), exist_ok=True)
 
     # Enqueue this task to the worker threads -- note that PriorityQueue needs the sense of priority reversed
@@ -234,21 +234,21 @@ def schedule(target, visited, enqueued, completed):
     enqueued.add(task)
 
 class Task:
-    def __init__(self, targets, deps, cwd, cmd, depfile, order_only_deps, msvc_show_includes, output_exclude, latency):
-        self.targets = targets
-        self.deps = deps
+    def __init__(self, outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency):
+        self.outputs = outputs
+        self.inputs = inputs
         self.cwd = cwd
         self.cmd = cmd
         self.depfile = depfile
-        self.order_only_deps = order_only_deps
+        self.order_only_inputs = order_only_inputs
         self.msvc_show_includes = msvc_show_includes
         self.output_exclude = output_exclude
         self.latency = latency
         self.priority = 0
 
-    # order_only_deps, output_exclude, priority are excluded from signatures because none of them should affect the targets' new content.
+    # order_only_inputs, output_exclude, priority are excluded from signatures because none of them should affect the outputs' new content.
     def signature(self):
-        info = (self.targets, self.deps, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
+        info = (self.outputs, self.inputs, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
 
 class FrozenNamespace:
@@ -282,21 +282,20 @@ def detect_host():
     return FrozenNamespace(os=os_map[system], arch=arch_map[machine])
 
 class EvalContext:
-    # Note that the DSL exposes "outputs"/"inputs", but these are remapped to "targets"/"deps" inside the internals of this script for clarity.
     def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
         if not isinstance(outputs, list):
             assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
             outputs = [outputs]
         if cmd is None: # phony rule -- no command -- XXX do we want to support phony rules with commands?
-            assert all(o.startswith(':') for o in outputs), outputs # phony rule targets must start with :
+            assert all(o.startswith(':') for o in outputs), outputs # phony rule outputs must start with :
             assert depfile is None, depfile # phony rules cannot have depfiles
             assert order_only_inputs is None, order_only_inputs # phony rules cannot have order_only_inputs
             assert msvc_show_includes == False, msvc_show_includes # phony rules cannot set msvc_show_includes
             assert output_exclude is None, output_exclude # phony rules cannot set output_exclude
             # XXX override latency = 0?
         else: # real rule -- has a command
-            assert all(o.startswith('_out/') for o in outputs), outputs # real rule targets must start with _out/
+            assert all(o.startswith('_out/') for o in outputs), outputs # real rule outputs must start with _out/
             assert isinstance(cmd, list), cmd # real rules must have a command, which is an argv list
             assert all(isinstance(x, str) for x in cmd), cmd
             cmd = cmd.copy()
@@ -314,7 +313,7 @@ class EvalContext:
         order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
         assert output_exclude is None or isinstance(output_exclude, str)
         if msvc_show_includes:
-            assert len(outputs) == 1, outputs # we only support 1 target for msvc_show_includes
+            assert len(outputs) == 1, outputs # we only support 1 output for msvc_show_includes
 
         task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for t in outputs:
@@ -322,7 +321,7 @@ class EvalContext:
                 die(f'ERROR: multiple ways to build {t!r}')
             tasks[t] = task
             if t not in make_db[cwd]:
-                make_db[cwd][t] = None # preallocate a slot for every possible target in the make_db before we launch the WorkerThreads
+                make_db[cwd][t] = None # preallocate a slot for every possible output in the make_db before we launch the WorkerThreads
 
     rule = task # ctx.task is the canonical interface, ctx.rule provided for familiarity
 
@@ -387,10 +386,10 @@ def propagate_latencies(target, latency, _active):
         return # nothing to do -- we are not increasing the priority of this task
     task.priority = latency # update this task's latency
 
-    # Recursively handle the dependencies, including order-only deps
+    # Recursively handle the inputs, including order-only inputs
     _active.add(target)
-    deps = [normpath(joinpath(task.cwd, x)) for x in task.deps]
-    for dep in itertools.chain(deps, task.order_only_deps):
+    deps = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
+    for dep in itertools.chain(deps, task.order_only_inputs):
         if dep in tasks:
             propagate_latencies(dep, latency, _active)
     _active.remove(target)
@@ -482,14 +481,14 @@ def main():
                 else:
                     assert status == 'finish', status
                     running.discard(payload)
-                    completed.update(payload.targets)
+                    completed.update(payload.outputs)
             if any_tasks_failed:
                 break
             if show_progress_line:
                 remaining_count = len((visited - completed) & tasks.keys())
                 if remaining_count:
                     def format_task_outputs(task):
-                        targets = [t.rsplit('/', 1)[-1] for t in task.targets]
+                        targets = [t.rsplit('/', 1)[-1] for t in task.outputs]
                         return targets[0] if len(targets) == 1 else f"[{' '.join(sorted(targets))}]"
                     names = ' '.join(sorted(format_task_outputs(task) for task in running))
                     progress = f'make.py: {remaining_count} left, building: {names}'
