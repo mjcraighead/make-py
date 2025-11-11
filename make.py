@@ -204,9 +204,7 @@ def schedule(target, visited, enqueued, completed):
             depfile_deps = []
             if rule.depfile:
                 try:
-                    with open(rule.depfile) as f:
-                        depfile_deps = f.read()
-                    depfile_deps = depfile_deps.replace('\\\n', '')
+                    depfile_deps = open(rule.depfile).read().replace('\\\n', '')
                     if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
                         depfile_deps = shlex.split(depfile_deps)[1:]
                     else:
