@@ -430,22 +430,25 @@ def parse_env_args(args):
     return FrozenNamespace(**env)
 
 def minimal_env(ctx):
-    if ctx.host.os == 'windows':
-        die('ERROR: --minimal-env is not supported yet on Windows')
-    path = '/usr/local/bin:/usr/bin:/bin'
-    if ctx.host.os == 'sunos':
-        path = '/usr/xpg4/bin:' + path
-    return {
-        'PATH': path,
-        'TMPDIR': '/tmp',
-        'HOME': '/homeless-shelter',
-        'USER': 'nobody',
-        'SHELL': '/bin/sh',
-        'LC_ALL': 'C.UTF-8',
-        'LANG': 'C.UTF-8',
-        'TZ': 'UTC',
-        'SOURCE_DATE_EPOCH': '0',
-    }
+    if ctx.host.os == 'windows': # currently identical to parse_env_args above, but may diverge if more are needed
+        keys = ['ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
+                'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE']
+        return {k: os.environ[k] for k in keys if k in os.environ}
+    else:
+        path = '/usr/local/bin:/usr/bin:/bin'
+        if ctx.host.os == 'sunos':
+            path = '/usr/xpg4/bin:' + path
+        return {
+            'PATH': path,
+            'TMPDIR': '/tmp',
+            'HOME': '/homeless-shelter',
+            'USER': 'nobody',
+            'SHELL': '/bin/sh',
+            'LC_ALL': 'C.UTF-8',
+            'LANG': 'C.UTF-8',
+            'TZ': 'UTC',
+            'SOURCE_DATE_EPOCH': '0',
+        }
 
 def main():
     # Parse command line
