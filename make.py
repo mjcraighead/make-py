@@ -281,7 +281,7 @@ def detect_host():
         die(f'ERROR: host detection failed: system={system!r} machine={machine!r}')
     return FrozenNamespace(os=os_map[system], arch=arch_map[machine])
 
-class BuildContext:
+class EvalContext:
     # Note that the DSL exposes "outputs"/"inputs", but these are remapped to "targets"/"deps" inside the internals of this script for clarity.
     def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
@@ -425,7 +425,7 @@ def main():
     args.targets = [normpath(joinpath(cwd, x)) for x in args.targets]
 
     # Set up rule DB, reading in .make.db files as we go
-    ctx = BuildContext()
+    ctx = EvalContext()
     ctx.host = detect_host()
     ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow rules to access ~
     visited = set()
