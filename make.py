@@ -367,8 +367,7 @@ def parse_rules_py(ctx, verbose, pathname, visited):
     if dirname not in make_db:
         make_db[dirname] = {}
         with contextlib.suppress(FileNotFoundError):
-            with open(f'{dirname}/_out/make.db') as f:
-                make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in f)
+            make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/make.db'))
     if hasattr(rules_py_module, 'submakes'):
         for f in rules_py_module.submakes():
             parse_rules_py(ctx, verbose, normpath(joinpath(dirname, f)), visited)
