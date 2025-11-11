@@ -431,6 +431,7 @@ def main():
     # Set up rule DB, reading in make.db files as we go
     ctx = BuildContext()
     ctx.host = detect_host()
+    ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow rules to access ~
     visited = set()
     for f in args.files:
         parse_rules_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
