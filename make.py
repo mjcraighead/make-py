@@ -44,7 +44,7 @@ make_db = {}
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
 priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when rule priorities are the same
-build_failed = False
+build_failed = False # global failure flag across all tasks in this run
 
 try:
     usable_columns = os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
@@ -458,9 +458,9 @@ def main():
         t.daemon = True # XXX this should probably be removed, but make sure Ctrl-C handling is correct
         t.start()
 
-    # Do the build, and try to shut down as cleanly as possible if we get a Ctrl-C
+    # Main loop: schedule/execute tasks, report progress, and shut down as cleanly as possible if we get a Ctrl-C
     try:
-        (enqueued, completed, building) = (set(), set(), set())
+        (enqueued, completed, running) = (set(), set(), set())
         while True:
             # Enqueue tasks to the workers
             visited = set()
@@ -475,10 +475,10 @@ def main():
                 if status == 'log':
                     stdout_write(payload)
                 elif status == 'start':
-                    building.add(payload)
+                    running.add(payload)
                 else:
                     assert status == 'finish', status
-                    building.discard(payload)
+                    running.discard(payload)
                     completed.update(payload.targets)
             if build_failed:
                 break
@@ -488,7 +488,7 @@ def main():
                     def format_rule_targets(rule):
                         targets = [t.rsplit('/', 1)[-1] for t in rule.targets]
                         return targets[0] if len(targets) == 1 else f"[{' '.join(sorted(targets))}]"
-                    names = ' '.join(sorted(format_rule_targets(rule) for rule in building))
+                    names = ' '.join(sorted(format_rule_targets(rule) for rule in running))
                     progress = f'make.py: {remaining_count} left, building: {names}'
                 else:
                     progress = ''
@@ -509,7 +509,7 @@ def main():
             t.join()
 
         # Write out the final .make.db files
-        # XXX May want to do this "occasionally" as the build is running?  (not too often to avoid a perf hit, but often
+        # XXX May want to do this "occasionally" as tasks are running?  (not too often to avoid a perf hit, but often
         # enough to avoid data loss)
         for (cwd, db) in make_db.items():
             db = {target: signature for (target, signature) in db.items() if signature is not None} # remove None tombstones
