@@ -350,11 +350,10 @@ def parse_rules_py(ctx, verbose, pathname, visited):
     if pathname in visited:
         return
     visited.add(pathname)
+
     if verbose:
         print(f'Parsing {pathname!r}...')
-
-    with open(pathname, encoding='utf-8') as f:
-        source = f.read()
+    source = open(pathname, encoding='utf-8').read()
     tree = ast.parse(source, filename=pathname)
     validate_rules_ast(tree, pathname)
 
