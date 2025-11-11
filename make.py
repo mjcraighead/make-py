@@ -162,10 +162,10 @@ class WorkerThread(threading.Thread):
                 execute(task, self.verbose)
             event_queue.put(('finish', task))
 
-def schedule(target, visited, enqueued, completed):
-    if target in visited or target in completed:
+def schedule(output, visited, enqueued, completed):
+    if output in visited or output in completed:
         return
-    task = tasks[target]
+    task = tasks[output]
     visited.update(task.outputs)
     if task in enqueued:
         return
@@ -195,8 +195,8 @@ def schedule(target, visited, enqueued, completed):
 
     # Do all outputs exist, and are all of them at least as new as every single input?
     local_make_db = make_db[task.cwd]
-    target_timestamp = min(get_timestamp_if_exists(t) for t in task.outputs) # oldest output timestamp, or -1.0 if any output is nonexistent
-    if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
+    output_timestamp = min(get_timestamp_if_exists(t) for t in task.outputs) # oldest output timestamp, or -1.0 if any output is nonexistent
+    if output_timestamp >= 0 and all(dep_timestamp <= output_timestamp for dep_timestamp in dep_timestamps):
         # Is the task's signature identical to the last time we ran it?
         signature = task.signature()
         if all(local_make_db.get(t) == signature for t in task.outputs):
@@ -214,7 +214,7 @@ def schedule(target, visited, enqueued, completed):
                     depfile_inputs = None # depfile was expected but missing -- always dirty
 
             # Do all depfile_inputs exist, and are all outputs at least as new as every single depfile_input?
-            if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_inputs):
+            if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(dep) <= output_timestamp for dep in depfile_inputs):
                 completed.update(task.outputs)
                 return # skip the task
 
@@ -377,22 +377,22 @@ def eval_tasks_py(ctx, verbose, pathname, visited):
             ctx.cwd = dirname
             getattr(tasks_py_module, name)(ctx)
 
-def propagate_latencies(target, latency, _active):
-    if target in _active:
-        die(f'ERROR: cycle detected involving {target!r}')
-    task = tasks[target]
+def propagate_latencies(output, latency, _active):
+    if output in _active:
+        die(f'ERROR: cycle detected involving {output!r}')
+    task = tasks[output]
     latency += task.latency
     if latency <= task.priority:
         return # nothing to do -- we are not increasing the priority of this task
     task.priority = latency # update this task's latency
 
     # Recursively handle the inputs, including order-only inputs
-    _active.add(target)
+    _active.add(output)
     deps = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
     for dep in itertools.chain(deps, task.order_only_inputs):
         if dep in tasks:
             propagate_latencies(dep, latency, _active)
-    _active.remove(target)
+    _active.remove(output)
 
 def drain_event_queue():
     while True:
@@ -416,7 +416,7 @@ def main():
     parser.add_argument('-f', '--file', dest='files', action='append', help='specify the path to a rules.py file (default is "rules.py")', metavar='FILE')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose build output')
-    parser.add_argument('targets', nargs='*', help='targets to build')
+    parser.add_argument('outputs', nargs='*', help='outputs to build')
     args = parser.parse_args()
     if args.jobs is None:
         args.jobs = os.cpu_count() # default to one job per CPU
@@ -424,7 +424,7 @@ def main():
         args.files = ['rules.py'] # default to "-f rules.py"
 
     cwd = os.getcwd()
-    args.targets = [normpath(joinpath(cwd, x)) for x in args.targets]
+    args.outputs = [normpath(joinpath(cwd, x)) for x in args.outputs]
 
     # Set up task DB, reading in .make.db files as we go
     ctx = EvalContext()
@@ -433,12 +433,12 @@ def main():
     visited = set()
     for f in args.files:
         eval_tasks_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
-    for target in args.targets:
-        if target not in tasks:
-            die(f'ERROR: no rule to build target {target!r}')
-        propagate_latencies(target, 0, set())
+    for output in args.outputs:
+        if output not in tasks:
+            die(f'ERROR: no rule to build {output!r}')
+        propagate_latencies(output, 0, set())
 
-    # Clean up stale targets from previous runs that no longer have tasks; also do an explicitly requested clean
+    # Clean up stale outputs from previous runs that no longer have tasks; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
         if args.clean:
             dirname = f'{cwd}/_out'
@@ -447,12 +447,12 @@ def main():
                 shutil.rmtree(dirname)
             for t in db:
                 db[t] = None
-        for (target, signature) in list(db.items()):
-            if target not in tasks and signature is not None:
+        for (output, signature) in list(db.items()):
+            if output not in tasks and signature is not None:
                 with contextlib.suppress(FileNotFoundError):
-                    os.unlink(target)
-                    print(f'Deleted stale target {target!r}.')
-                del db[target]
+                    os.unlink(output)
+                    print(f'Deleted stale output {output!r}.')
+                del db[output]
 
     # Create and start worker threads
     threads = [WorkerThread(args.verbose) for i in range(args.jobs)]
@@ -466,9 +466,9 @@ def main():
         while True:
             # Enqueue tasks to the workers
             visited = set()
-            for target in args.targets:
-                schedule(target, visited, enqueued, completed)
-            if all(target in completed for target in args.targets):
+            for output in args.outputs:
+                schedule(output, visited, enqueued, completed)
+            if all(output in completed for output in args.outputs):
                 break
 
             # Handle events from worker threads, then show progress update and exit if done
@@ -488,8 +488,8 @@ def main():
                 remaining_count = len((visited - completed) & tasks.keys())
                 if remaining_count:
                     def format_task_outputs(task):
-                        targets = [t.rsplit('/', 1)[-1] for t in task.outputs]
-                        return targets[0] if len(targets) == 1 else f"[{' '.join(sorted(targets))}]"
+                        outputs = [t.rsplit('/', 1)[-1] for t in task.outputs]
+                        return outputs[0] if len(outputs) == 1 else f"[{' '.join(sorted(outputs))}]"
                     names = ' '.join(sorted(format_task_outputs(task) for task in running))
                     progress = f'make.py: {remaining_count} left, building: {names}'
                 else:
@@ -501,7 +501,7 @@ def main():
                 else:
                     progress = progress[:usable_columns]
                 stdout_write('\r' + progress)
-            if all(target in completed for target in args.targets):
+            if all(output in completed for output in args.outputs):
                 break
     finally:
         # Shut down the system by sending sentinel tokens to all the threads
@@ -514,12 +514,12 @@ def main():
         # XXX May want to do this "occasionally" as tasks are running?  (not too often to avoid a perf hit, but often
         # enough to avoid data loss)
         for (cwd, db) in make_db.items():
-            db = {target: signature for (target, signature) in db.items() if signature is not None} # remove None tombstones
+            db = {output: signature for (output, signature) in db.items() if signature is not None} # remove None tombstones
             if db:
                 with contextlib.suppress(FileExistsError):
                     os.mkdir(f'{cwd}/_out')
                 tmp_path = f'{cwd}/_out/.make.db.tmp'
-                open(tmp_path, 'w').write(''.join(f'{target} {signature}\n' for (target, signature) in db.items()))
+                open(tmp_path, 'w').write(''.join(f'{output} {signature}\n' for (output, signature) in db.items()))
                 os.replace(tmp_path, f'{cwd}/_out/.make.db')
             else:
                 with contextlib.suppress(FileNotFoundError):
