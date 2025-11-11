@@ -283,7 +283,7 @@ def detect_host():
 
 class EvalContext:
     # Note that the DSL exposes "outputs"/"inputs", but these are remapped to "targets"/"deps" inside the internals of this script for clarity.
-    def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
+    def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
         cwd = self.cwd
         if not isinstance(outputs, list):
             assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
@@ -323,6 +323,8 @@ class EvalContext:
             tasks[t] = task
             if t not in make_db[cwd]:
                 make_db[cwd][t] = None # preallocate a slot for every possible target in the make_db before we launch the WorkerThreads
+
+    rule = task # ctx.task is the canonical interface, ctx.rule provided for familiarity
 
 # Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
 def validate_rules_ast(tree, path):
