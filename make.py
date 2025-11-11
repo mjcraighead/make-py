@@ -147,7 +147,7 @@ def execute(rule, verbose):
         event_queue.put(('log', built_text))
     return True
 
-class BuilderThread(threading.Thread):
+class WorkerThread(threading.Thread):
     def __init__(self, verbose):
         super().__init__()
         self.verbose = verbose
@@ -229,7 +229,7 @@ def schedule(target, visited, enqueued, completed):
     for t in rule.targets:
         os.makedirs(os.path.dirname(t), exist_ok=True)
 
-    # Enqueue this task to a builder thread -- note that PriorityQueue needs the sense of priority reversed
+    # Enqueue this task to the worker threads -- note that PriorityQueue needs the sense of priority reversed
     task_queue.put((-rule.priority, next(priority_queue_counter), rule))
     enqueued.add(rule)
 
@@ -322,7 +322,7 @@ class BuildContext:
                 die(f'ERROR: multiple ways to build {t!r}')
             rules[t] = rule
             if t not in make_db[cwd]:
-                make_db[cwd][t] = None # preallocate a slot for every possible target in the make_db before we launch the BuilderThreads
+                make_db[cwd][t] = None # preallocate a slot for every possible target in the make_db before we launch the WorkerThreads
 
 # Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
 def validate_rules_ast(tree, path):
@@ -452,8 +452,8 @@ def main():
                     print(f'Deleted stale target {target!r}.')
                 del db[target]
 
-    # Create and start builder threads
-    threads = [BuilderThread(args.verbose) for i in range(args.jobs)]
+    # Create and start worker threads
+    threads = [WorkerThread(args.verbose) for i in range(args.jobs)]
     for t in threads:
         t.daemon = True # XXX this should probably be removed, but make sure Ctrl-C handling is correct
         t.start()
@@ -462,15 +462,15 @@ def main():
     try:
         (enqueued, completed, building) = (set(), set(), set())
         while True:
-            # Enqueue work to the builders
+            # Enqueue tasks to the workers
             visited = set()
             for target in args.targets:
                 schedule(target, visited, enqueued, completed)
             if all(target in completed for target in args.targets):
                 break
 
-            # Handle events from builder threads, then show progress update and exit if done
-            # Be careful about iterating over data structures being edited concurrently by the BuilderThreads
+            # Handle events from worker threads, then show progress update and exit if done
+            # Be careful about iterating over data structures being edited concurrently by the WorkerThreads
             for (status, payload) in drain_event_queue():
                 if status == 'log':
                     stdout_write(payload)
