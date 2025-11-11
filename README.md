@@ -38,8 +38,14 @@ but still **small enough to understand**.
 - Works on **Windows** (both Win32 and WSL), **Linux**, **macOS**, and other Unix systems (FreeBSD, etc.).
 - Built-in host detection (`ctx.host`) exposing normalized OS/architecture information for portable rules.
 
+### 🌍 Environment handling
+- New `--minimal-env` option for hermetic subprocess environments:
+  - On POSIX, provides a fixed minimal `PATH`, `HOME`, and locale (UTF-8, UTC).
+  - On Windows, injects only the minimal set of system variables needed to run toolchains.
+- `--env KEY=VALUE` exposes external config to `rules.py` as `ctx.env.KEY`, for per-host or per-distro customization.
+
 ### ⚙️ Lightweight by design
-- Entire tool lives in a **single Python file (~550 lines)**.
+- Entire tool lives in a **single Python file (~600 lines)**.
 - No dependencies beyond Python itself (3.6+).
 
 ## 🧱 Python with guardrails (evolving toward a Starlark-like subset)
@@ -60,6 +66,7 @@ reproducible, and future-proof.
 ## 🚧 Planned Features
 - Optional SHA-256–based dependency tracking instead of timestamp comparisons.
 - Improved diagnostics for invalid rule definitions and dependency cycles.
+- Environment variable overrides in rule definitions.
 - More complete compatibility with other Starlark implementations and .bzl files.
 
 ## 🧾 Requirements
