@@ -117,7 +117,7 @@ def execute(task, verbose):
         r = re.compile(task.output_exclude)
         out = '\n'.join(line for line in out.splitlines() if not r.match(line))
 
-    built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in task.outputs)
+    built_text = 'Built %s.\n' % '\n  and '.join(repr(output) for output in task.outputs)
     if show_progress_line: # need to precede "Built [...]" with erasing the current progress indicator
         built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
@@ -131,16 +131,16 @@ def execute(task, verbose):
         global any_tasks_failed
         any_tasks_failed = True
         event_queue.put(('log', f'{built_text}{out}\n\n'))
-        for t in task.outputs:
+        for output in task.outputs:
             with contextlib.suppress(FileNotFoundError):
-                os.unlink(t)
+                os.unlink(output)
         return False
 
     local_make_db = make_db[task.cwd]
     signature = task.signature()
-    for t in task.outputs:
-        assert t in local_make_db, t # make sure slot is already allocated
-        local_make_db[t] = signature
+    for output in task.outputs:
+        assert output in local_make_db, output # make sure slot is already allocated
+        local_make_db[output] = signature
     if out:
         event_queue.put(('log', f'{built_text}{out}\n\n'))
     elif not show_progress_line:
@@ -188,18 +188,18 @@ def schedule(output, visited, enqueued, completed):
         if input_timestamp < 0:
             global any_tasks_failed
             any_tasks_failed = True
-            msg = f"ERROR: input {input!r} of {' '.join(repr(t) for t in task.outputs)} is nonexistent"
+            msg = f"ERROR: input {input!r} of {' '.join(repr(output) for output in task.outputs)} is nonexistent"
             if show_progress_line:
                 msg = '\r%s\r%s' % (' ' * usable_columns, msg)
             die(msg)
 
     # Do all outputs exist, and are all of them at least as new as every single input?
     local_make_db = make_db[task.cwd]
-    output_timestamp = min(get_timestamp_if_exists(t) for t in task.outputs) # oldest output timestamp, or -1.0 if any output is nonexistent
+    output_timestamp = min(get_timestamp_if_exists(output) for output in task.outputs) # oldest output timestamp, or -1.0 if any output is nonexistent
     if output_timestamp >= 0 and all(input_timestamp <= output_timestamp for input_timestamp in input_timestamps):
         # Is the task's signature identical to the last time we ran it?
         signature = task.signature()
-        if all(local_make_db.get(t) == signature for t in task.outputs):
+        if all(local_make_db.get(output) == signature for output in task.outputs):
             # Parse the depfile, if present
             depfile_inputs = []
             if task.depfile:
@@ -219,15 +219,15 @@ def schedule(output, visited, enqueued, completed):
                 return # skip the task
 
     # Remove stale outputs immediately once this task is marked dirty
-    for t in task.outputs:
+    for output in task.outputs:
         with contextlib.suppress(FileNotFoundError):
-            os.unlink(t)
-        assert t in local_make_db, t # make sure slot is already allocated
-        local_make_db[t] = None
+            os.unlink(output)
+        assert output in local_make_db, output # make sure slot is already allocated
+        local_make_db[output] = None
 
     # Ensure outputs' parent directories exist
-    for t in task.outputs:
-        os.makedirs(os.path.dirname(t), exist_ok=True)
+    for output in task.outputs:
+        os.makedirs(os.path.dirname(output), exist_ok=True)
 
     # Enqueue this task to the worker threads -- note that PriorityQueue needs the sense of priority reversed
     task_queue.put((-task.priority, next(priority_queue_counter), task))
@@ -316,12 +316,12 @@ class EvalContext:
             assert len(outputs) == 1, outputs # we only support 1 output for msvc_show_includes
 
         task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
-        for t in outputs:
-            if t in tasks:
-                die(f'ERROR: multiple ways to build {t!r}')
-            tasks[t] = task
-            if t not in make_db[cwd]:
-                make_db[cwd][t] = None # preallocate a slot for every possible output in the make_db before we launch the WorkerThreads
+        for output in outputs:
+            if output in tasks:
+                die(f'ERROR: multiple ways to build {output!r}')
+            tasks[output] = task
+            if output not in make_db[cwd]:
+                make_db[cwd][output] = None # preallocate a slot for every possible output in the make_db before we launch the WorkerThreads
 
     rule = task # ctx.task is the canonical interface, ctx.rule provided for familiarity
 
@@ -445,8 +445,8 @@ def main():
             if os.path.exists(dirname):
                 print(f'Cleaning {dirname!r}...')
                 shutil.rmtree(dirname)
-            for t in db:
-                db[t] = None
+            for output in db:
+                db[output] = None
         for (output, signature) in list(db.items()):
             if output not in tasks and signature is not None:
                 with contextlib.suppress(FileNotFoundError):
@@ -488,7 +488,7 @@ def main():
                 remaining_count = len((visited - completed) & tasks.keys())
                 if remaining_count:
                     def format_task_outputs(task):
-                        outputs = [t.rsplit('/', 1)[-1] for t in task.outputs]
+                        outputs = [output.rsplit('/', 1)[-1] for output in task.outputs]
                         return outputs[0] if len(outputs) == 1 else f"[{' '.join(sorted(outputs))}]"
                     names = ' '.join(sorted(format_task_outputs(task) for task in running))
                     progress = f'make.py: {remaining_count} left, building: {names}'
