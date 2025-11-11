@@ -248,9 +248,10 @@ class Task:
         self.latency = latency
         self.priority = 0
 
-    # order_only_inputs, output_exclude, priority are excluded from signatures because none of them should affect the outputs' new content.
+    # output_exclude and priority are excluded from signatures because they do not affect the outputs' content.
+    # outputs, inputs, and order_only_inputs are included since they alter DAG structure (and thus execution ordering and correctness).
     def signature(self):
-        info = (self.outputs, self.inputs, self.cwd, self.cmd, self.depfile, self.msvc_show_includes)
+        info = (self.outputs, self.inputs, self.cwd, self.cmd, self.depfile, self.order_only_inputs, self.msvc_show_includes)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
 
 class FrozenNamespace:
