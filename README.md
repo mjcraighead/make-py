@@ -39,7 +39,7 @@ but still **small enough to understand**.
 - Built-in host detection (`ctx.host`) exposing normalized OS/architecture information for portable rules.
 
 ### ⚙️ Lightweight by design
-- Entire tool lives in a **single Python file (~500 lines)**.
+- Entire tool lives in a **single Python file (~550 lines)**.
 - No dependencies beyond Python itself (3.6+).
 
 ## 🧱 Python with guardrails (evolving toward a Starlark-like subset)

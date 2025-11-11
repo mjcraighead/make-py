@@ -412,6 +412,17 @@ def drain_event_queue():
             break
     return events
 
+def parse_env_args(args):
+    env = {}
+    for arg in args:
+        if '=' not in arg:
+            die(f'ERROR: invalid --env format (expected key=value): {arg!r}')
+        (k, v) = arg.split('=', 1)
+        if not k.isidentifier():
+            die(f'ERROR: invalid key name for --env: {k!r}')
+        env[k] = v
+    return FrozenNamespace(**env)
+
 def main():
     # Parse command line
     parser = argparse.ArgumentParser()
@@ -419,6 +430,7 @@ def main():
     parser.add_argument('-f', '--file', dest='files', action='append', help='specify the path to a rules.py file (default is "rules.py")', metavar='FILE')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose output')
+    parser.add_argument('--env', action='append', default=[], help="set ctx.env.KEY to VALUE in rules.py evaluation environment", metavar='KEY=VALUE')
     parser.add_argument('outputs', nargs='*', help='outputs to make')
     args = parser.parse_args()
     if args.jobs is None:
@@ -432,6 +444,7 @@ def main():
     # Set up task DB, reading in .make.db files as we go
     ctx = EvalContext()
     ctx.host = detect_host()
+    ctx.env = parse_env_args(args.env)
     ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow tasks to access ~
     visited = set()
     for f in args.files:
