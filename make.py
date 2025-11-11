@@ -373,9 +373,10 @@ def eval_tasks_py(ctx, verbose, pathname, visited):
     if hasattr(tasks_py_module, 'submakes'):
         for f in tasks_py_module.submakes():
             eval_tasks_py(ctx, verbose, normpath(joinpath(dirname, f)), visited)
-    if hasattr(tasks_py_module, 'rules'):
-        ctx.cwd = dirname
-        tasks_py_module.rules(ctx)
+    for name in ['tasks', 'rules']: # evaluate modern API first, then legacy API if present
+        if hasattr(tasks_py_module, name):
+            ctx.cwd = dirname
+            getattr(tasks_py_module, name)(ctx)
 
 def propagate_latencies(target, latency, _active):
     if target in _active:
