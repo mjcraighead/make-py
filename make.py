@@ -154,7 +154,7 @@ class WorkerThread(threading.Thread):
 
     def run(self):
         while not any_tasks_failed:
-            (priority, counter, task) = task_queue.get()
+            (_, _, task) = task_queue.get()
             if task is None:
                 break
             if task.cmd is not None:
@@ -485,10 +485,10 @@ def main():
             if show_progress_line:
                 remaining_count = len((visited - completed) & tasks.keys())
                 if remaining_count:
-                    def format_rule_targets(rule):
-                        targets = [t.rsplit('/', 1)[-1] for t in rule.targets]
+                    def format_task_outputs(task):
+                        targets = [t.rsplit('/', 1)[-1] for t in task.targets]
                         return targets[0] if len(targets) == 1 else f"[{' '.join(sorted(targets))}]"
-                    names = ' '.join(sorted(format_rule_targets(rule) for rule in running))
+                    names = ' '.join(sorted(format_task_outputs(task) for task in running))
                     progress = f'make.py: {remaining_count} left, building: {names}'
                 else:
                     progress = ''
@@ -504,7 +504,7 @@ def main():
     finally:
         # Shut down the system by sending sentinel tokens to all the threads
         for i in range(args.jobs):
-            task_queue.put((1000000, 0, None)) # lower priority than any real rule
+            task_queue.put((1000000, 0, None)) # lower priority than any real task
         for t in threads:
             t.join()
 
