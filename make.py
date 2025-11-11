@@ -326,8 +326,8 @@ class EvalContext:
 
     rule = task # ctx.task is the canonical interface, ctx.rule provided for familiarity
 
-# Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
-def validate_rules_ast(tree, path):
+# Reject disallowed constructs in tasks.py/rules.py -- a non-Turing-complete Starlark-like DSL
+def validate_tasks_ast(tree, path):
     BANNED = (
         ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
         ast.ImportFrom, # XXX ast.Import temporarily allowed here as a transitional aid for now
@@ -348,7 +348,7 @@ def validate_rules_ast(tree, path):
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
             raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
 
-def parse_rules_py(ctx, verbose, pathname, visited):
+def eval_tasks_py(ctx, verbose, pathname, visited):
     if pathname in visited:
         return
     visited.add(pathname)
@@ -357,25 +357,25 @@ def parse_rules_py(ctx, verbose, pathname, visited):
         print(f'Parsing {pathname!r}...')
     source = open(pathname, encoding='utf-8').read()
     tree = ast.parse(source, filename=pathname)
-    validate_rules_ast(tree, pathname)
+    validate_tasks_ast(tree, pathname)
 
-    spec = importlib.util.spec_from_file_location(f'rules{len(visited)}', pathname)
+    spec = importlib.util.spec_from_file_location(f'tasks{len(visited)}', pathname)
     if spec is None or spec.loader is None:
         raise ImportError(f'Cannot import {pathname!r}')
-    rules_py_module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(rules_py_module)
+    tasks_py_module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tasks_py_module)
 
     dirname = os.path.dirname(pathname)
     if dirname not in make_db:
         make_db[dirname] = {}
         with contextlib.suppress(FileNotFoundError):
             make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/.make.db'))
-    if hasattr(rules_py_module, 'submakes'):
-        for f in rules_py_module.submakes():
-            parse_rules_py(ctx, verbose, normpath(joinpath(dirname, f)), visited)
-    if hasattr(rules_py_module, 'rules'):
+    if hasattr(tasks_py_module, 'submakes'):
+        for f in tasks_py_module.submakes():
+            eval_tasks_py(ctx, verbose, normpath(joinpath(dirname, f)), visited)
+    if hasattr(tasks_py_module, 'rules'):
         ctx.cwd = dirname
-        rules_py_module.rules(ctx)
+        tasks_py_module.rules(ctx)
 
 def propagate_latencies(target, latency, _active):
     if target in _active:
@@ -432,7 +432,7 @@ def main():
     ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow tasks to access ~
     visited = set()
     for f in args.files:
-        parse_rules_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
+        eval_tasks_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
     for target in args.targets:
         if target not in tasks:
             die(f'ERROR: no rule to build target {target!r}')
