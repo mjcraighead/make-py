@@ -367,7 +367,7 @@ def parse_rules_py(ctx, verbose, pathname, visited):
     if dirname not in make_db:
         make_db[dirname] = {}
         with contextlib.suppress(FileNotFoundError):
-            make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/make.db'))
+            make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/.make.db'))
     if hasattr(rules_py_module, 'submakes'):
         for f in rules_py_module.submakes():
             parse_rules_py(ctx, verbose, normpath(joinpath(dirname, f)), visited)
@@ -424,7 +424,7 @@ def main():
     cwd = os.getcwd()
     args.targets = [normpath(joinpath(cwd, x)) for x in args.targets]
 
-    # Set up rule DB, reading in make.db files as we go
+    # Set up rule DB, reading in .make.db files as we go
     ctx = BuildContext()
     ctx.host = detect_host()
     ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow rules to access ~
@@ -508,7 +508,7 @@ def main():
         for t in threads:
             t.join()
 
-        # Write out the final make.db files
+        # Write out the final .make.db files
         # XXX May want to do this "occasionally" as the build is running?  (not too often to avoid a perf hit, but often
         # enough to avoid data loss)
         for (cwd, db) in make_db.items():
@@ -516,12 +516,12 @@ def main():
             if db:
                 with contextlib.suppress(FileExistsError):
                     os.mkdir(f'{cwd}/_out')
-                tmp_path = f'{cwd}/_out/make.db.tmp'
+                tmp_path = f'{cwd}/_out/.make.db.tmp'
                 open(tmp_path, 'w').write(''.join(f'{target} {signature}\n' for (target, signature) in db.items()))
-                os.replace(tmp_path, f'{cwd}/_out/make.db')
+                os.replace(tmp_path, f'{cwd}/_out/.make.db')
             else:
                 with contextlib.suppress(FileNotFoundError):
-                    os.unlink(f'{cwd}/_out/make.db')
+                    os.unlink(f'{cwd}/_out/.make.db')
 
     if build_failed:
         sys.exit(1)
