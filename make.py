@@ -39,7 +39,7 @@ import threading
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
 
-rules = {}
+tasks = {}
 make_db = {}
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
@@ -165,7 +165,7 @@ class WorkerThread(threading.Thread):
 def schedule(target, visited, enqueued, completed):
     if target in visited or target in completed:
         return
-    rule = rules[target]
+    rule = tasks[target]
     visited.update(rule.targets)
     if rule in enqueued:
         return
@@ -174,7 +174,7 @@ def schedule(target, visited, enqueued, completed):
     # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous run
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     for dep in itertools.chain(deps, rule.order_only_deps):
-        if dep in rules:
+        if dep in tasks:
             schedule(dep, visited, enqueued, completed)
         else:
             visited.add(dep)
@@ -318,9 +318,9 @@ class EvalContext:
 
         rule = Rule(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for t in outputs:
-            if t in rules:
+            if t in tasks:
                 die(f'ERROR: multiple ways to build {t!r}')
-            rules[t] = rule
+            tasks[t] = rule
             if t not in make_db[cwd]:
                 make_db[cwd][t] = None # preallocate a slot for every possible target in the make_db before we launch the WorkerThreads
 
@@ -378,7 +378,7 @@ def parse_rules_py(ctx, verbose, pathname, visited):
 def propagate_latencies(target, latency, _active):
     if target in _active:
         die(f'ERROR: cycle detected involving {target!r}')
-    rule = rules[target]
+    rule = tasks[target]
     latency += rule.latency
     if latency <= rule.priority:
         return # nothing to do -- we are not increasing the priority of this rule
@@ -388,7 +388,7 @@ def propagate_latencies(target, latency, _active):
     _active.add(target)
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     for dep in itertools.chain(deps, rule.order_only_deps):
-        if dep in rules:
+        if dep in tasks:
             propagate_latencies(dep, latency, _active)
     _active.remove(target)
 
@@ -424,19 +424,19 @@ def main():
     cwd = os.getcwd()
     args.targets = [normpath(joinpath(cwd, x)) for x in args.targets]
 
-    # Set up rule DB, reading in .make.db files as we go
+    # Set up task DB, reading in .make.db files as we go
     ctx = EvalContext()
     ctx.host = detect_host()
-    ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow rules to access ~
+    ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow tasks to access ~
     visited = set()
     for f in args.files:
         parse_rules_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
     for target in args.targets:
-        if target not in rules:
+        if target not in tasks:
             die(f'ERROR: no rule to build target {target!r}')
         propagate_latencies(target, 0, set())
 
-    # Clean up stale targets from previous runs that no longer have rules; also do an explicitly requested clean
+    # Clean up stale targets from previous runs that no longer have tasks; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
         if args.clean:
             dirname = f'{cwd}/_out'
@@ -446,7 +446,7 @@ def main():
             for t in db:
                 db[t] = None
         for (target, signature) in list(db.items()):
-            if target not in rules and signature is not None:
+            if target not in tasks and signature is not None:
                 with contextlib.suppress(FileNotFoundError):
                     os.unlink(target)
                     print(f'Deleted stale target {target!r}.')
@@ -483,7 +483,7 @@ def main():
             if build_failed:
                 break
             if show_progress_line:
-                remaining_count = len((visited - completed) & rules.keys())
+                remaining_count = len((visited - completed) & tasks.keys())
                 if remaining_count:
                     def format_rule_targets(rule):
                         targets = [t.rsplit('/', 1)[-1] for t in rule.targets]
