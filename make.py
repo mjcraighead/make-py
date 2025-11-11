@@ -512,13 +512,16 @@ def main():
         # XXX May want to do this "occasionally" as the build is running?  (not too often to avoid a perf hit, but often
         # enough to avoid data loss)
         for (cwd, db) in make_db.items():
-            with contextlib.suppress(FileExistsError):
-                os.mkdir(f'{cwd}/_out')
-            with open(f'{cwd}/_out/make.db.tmp', 'w') as f:
-                for (target, signature) in db.items():
-                    if signature is not None:
-                        f.write(f'{target} {signature}\n')
-            os.replace(f'{cwd}/_out/make.db.tmp', f'{cwd}/_out/make.db')
+            db = {target: signature for (target, signature) in db.items() if signature is not None} # remove None tombstones
+            if db:
+                with contextlib.suppress(FileExistsError):
+                    os.mkdir(f'{cwd}/_out')
+                tmp_path = f'{cwd}/_out/make.db.tmp'
+                open(tmp_path, 'w').write(''.join(f'{target} {signature}\n' for (target, signature) in db.items()))
+                os.replace(tmp_path, f'{cwd}/_out/make.db')
+            else:
+                with contextlib.suppress(FileNotFoundError):
+                    os.unlink(f'{cwd}/_out/make.db')
 
     if build_failed:
         sys.exit(1)
