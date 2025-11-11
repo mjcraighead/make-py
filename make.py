@@ -171,7 +171,7 @@ def schedule(target, visited, enqueued, completed):
         return
 
     # Recurse into dependencies and order-only deps and wait for them to complete
-    # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous build
+    # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous run
     deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
     for dep in itertools.chain(deps, rule.order_only_deps):
         if dep in rules:
@@ -216,7 +216,7 @@ def schedule(target, visited, enqueued, completed):
             # Do all depfile_deps exist, and are all targets at least as new as every single depfile_dep?
             if depfile_deps is not None and all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
                 completed.update(rule.targets)
-                return # skip the build
+                return # skip the task
 
     # Remove stale targets immediately once this rule is marked dirty
     for t in rule.targets:
@@ -436,7 +436,7 @@ def main():
             die(f'ERROR: no rule to build target {target!r}')
         propagate_latencies(target, 0, set())
 
-    # Clean up stale targets from previous builds that no longer have rules; also do an explicitly requested clean
+    # Clean up stale targets from previous runs that no longer have rules; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
         if args.clean:
             dirname = f'{cwd}/_out'
