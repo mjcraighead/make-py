@@ -435,7 +435,7 @@ def main():
     parser.add_argument('-f', '--file', dest='files', action='append', help='specify the path to a rules.py file (default is "rules.py")', metavar='FILE')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose output')
-    parser.add_argument('--env', action='append', default=[], help="set ctx.env.KEY to VALUE in rules.py evaluation environment", metavar='KEY=VALUE')
+    parser.add_argument('--env', action='append', default=[], help='set ctx.env.KEY to VALUE in rules.py evaluation environment', metavar='KEY=VALUE')
     parser.add_argument('outputs', nargs='*', help='outputs to make')
     args = parser.parse_args()
     if args.jobs is None:
