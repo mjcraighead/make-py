@@ -318,7 +318,7 @@ class EvalContext:
         task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for output in outputs:
             if output in tasks:
-                die(f'ERROR: multiple ways to build {output!r}')
+                die(f'ERROR: multiple ways to make {output!r}')
             tasks[output] = task
             if output not in make_db[cwd]:
                 make_db[cwd][output] = None # preallocate a slot for every possible output in the make_db before we launch the WorkerThreads
@@ -412,11 +412,11 @@ def drain_event_queue():
 def main():
     # Parse command line
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--clean', action='store_true', help='clean before building')
+    parser.add_argument('-c', '--clean', action='store_true', help='clean _out directories first')
     parser.add_argument('-f', '--file', dest='files', action='append', help='specify the path to a rules.py file (default is "rules.py")', metavar='FILE')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
-    parser.add_argument('-v', '--verbose', action='store_true', help='print verbose build output')
-    parser.add_argument('outputs', nargs='*', help='outputs to build')
+    parser.add_argument('-v', '--verbose', action='store_true', help='print verbose output')
+    parser.add_argument('outputs', nargs='*', help='outputs to make')
     args = parser.parse_args()
     if args.jobs is None:
         args.jobs = os.cpu_count() # default to one job per CPU
@@ -435,7 +435,7 @@ def main():
         eval_tasks_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
     for output in args.outputs:
         if output not in tasks:
-            die(f'ERROR: no rule to build {output!r}')
+            die(f'ERROR: no rule to make {output!r}')
         propagate_latencies(output, 0, set())
 
     # Clean up stale outputs from previous runs that no longer have tasks; also do an explicitly requested clean
