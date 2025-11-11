@@ -413,7 +413,12 @@ def drain_event_queue():
     return events
 
 def parse_env_args(args):
-    env = {}
+    if os.name == 'nt': # Windows: inject the smallest viable subset of os.environ needed to execute system tools
+        keys = ['ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
+                'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE']
+        env = {k: os.environ[k] for k in keys if k in os.environ}
+    else:
+        env = {} # POSIX: no injection; hermetic by default
     for arg in args:
         if '=' not in arg:
             die(f'ERROR: invalid --env format (expected key=value): {arg!r}')
