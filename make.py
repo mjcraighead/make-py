@@ -97,20 +97,20 @@ def execute(task, verbose):
     if task.msvc_show_includes:
         # Parse MSVC /showIncludes output, skipping system headers
         r = re.compile(r'^Note: including file:\s*(.*)$')
-        (deps, new_out) = (set(), [])
+        (inputs, new_out) = (set(), [])
         for line in out.splitlines():
             m = r.match(line)
             if m:
-                dep = normpath(m.group(1))
-                if not dep.startswith('c:/program files'):
-                    deps.add(dep)
+                input = normpath(m.group(1))
+                if not input.startswith('c:/program files'):
+                    inputs.add(input)
             else:
                 new_out.append(line)
         out = '' if len(new_out) == 1 else '\n'.join(new_out) # drop lone "source.c" line printed by MSVC
 
         # Write a make-style depfile listing all included headers
         tmp_path = f'{task.depfile}.tmp'
-        parts = [f'{task.outputs[0]}:'] + sorted(deps) # we checked for only 1 output at task declaration time
+        parts = [f'{task.outputs[0]}:'] + sorted(inputs) # we checked for only 1 output at task declaration time
         open(tmp_path, 'w').write(' \\\n  '.join(parts) + '\n') # add line continuations and indentation
         os.replace(tmp_path, task.depfile)
     elif task.output_exclude:
@@ -170,25 +170,25 @@ def schedule(output, visited, enqueued, completed):
     if task in enqueued:
         return
 
-    # Recurse into dependencies and order-only deps and wait for them to complete
-    # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous run
-    deps = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
-    for dep in itertools.chain(deps, task.order_only_inputs):
-        if dep in tasks:
-            schedule(dep, visited, enqueued, completed)
+    # Recurse into inputs and order-only inputs and wait for them to complete
+    # Never recurse into depfile inputs here, as the .d file could be stale/garbage from a previous run
+    inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
+    for input in itertools.chain(inputs, task.order_only_inputs):
+        if input in tasks:
+            schedule(input, visited, enqueued, completed)
         else:
-            visited.add(dep)
-            completed.add(dep)
-    if any(dep not in completed for dep in itertools.chain(deps, task.order_only_inputs)):
+            visited.add(input)
+            completed.add(input)
+    if any(input not in completed for input in itertools.chain(inputs, task.order_only_inputs)):
         return
 
-    # Error if any of the deps does not exist -- they should always exist by this point
-    dep_timestamps = [get_timestamp_if_exists(dep) for dep in deps]
-    for (dep, dep_timestamp) in zip(deps, dep_timestamps):
-        if dep_timestamp < 0:
+    # Error if any of the inputs does not exist -- they should always exist by this point
+    input_timestamps = [get_timestamp_if_exists(input) for input in inputs]
+    for (input, input_timestamp) in zip(inputs, input_timestamps):
+        if input_timestamp < 0:
             global any_tasks_failed
             any_tasks_failed = True
-            msg = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in task.outputs)} is nonexistent"
+            msg = f"ERROR: input {input!r} of {' '.join(repr(t) for t in task.outputs)} is nonexistent"
             if show_progress_line:
                 msg = '\r%s\r%s' % (' ' * usable_columns, msg)
             die(msg)
@@ -196,7 +196,7 @@ def schedule(output, visited, enqueued, completed):
     # Do all outputs exist, and are all of them at least as new as every single input?
     local_make_db = make_db[task.cwd]
     output_timestamp = min(get_timestamp_if_exists(t) for t in task.outputs) # oldest output timestamp, or -1.0 if any output is nonexistent
-    if output_timestamp >= 0 and all(dep_timestamp <= output_timestamp for dep_timestamp in dep_timestamps):
+    if output_timestamp >= 0 and all(input_timestamp <= output_timestamp for input_timestamp in input_timestamps):
         # Is the task's signature identical to the last time we ran it?
         signature = task.signature()
         if all(local_make_db.get(t) == signature for t in task.outputs):
@@ -214,7 +214,7 @@ def schedule(output, visited, enqueued, completed):
                     depfile_inputs = None # depfile was expected but missing -- always dirty
 
             # Do all depfile_inputs exist, and are all outputs at least as new as every single depfile_input?
-            if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(dep) <= output_timestamp for dep in depfile_inputs):
+            if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(input) <= output_timestamp for input in depfile_inputs):
                 completed.update(task.outputs)
                 return # skip the task
 
@@ -388,10 +388,10 @@ def propagate_latencies(output, latency, _active):
 
     # Recursively handle the inputs, including order-only inputs
     _active.add(output)
-    deps = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
-    for dep in itertools.chain(deps, task.order_only_inputs):
-        if dep in tasks:
-            propagate_latencies(dep, latency, _active)
+    inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
+    for input in itertools.chain(inputs, task.order_only_inputs):
+        if input in tasks:
+            propagate_latencies(input, latency, _active)
     _active.remove(output)
 
 def drain_event_queue():
