@@ -45,6 +45,7 @@ task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
 priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when task priorities are the same
 any_tasks_failed = False # global failure flag across all tasks in this run
+default_subprocess_env = os.environ.copy() # default inherited env for subprocess.run
 
 try:
     usable_columns = os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
@@ -88,7 +89,7 @@ def execute(task, verbose):
     try:
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
         # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
-        result = subprocess.run(task.cmd, cwd=task.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        result = subprocess.run(task.cmd, cwd=task.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=default_subprocess_env)
         out = result.stdout.decode('utf-8', 'replace').strip() # Assumes UTF-8, but robust if not -- XXX consider changing out to bytes
         code = result.returncode
     except Exception as e:
@@ -428,6 +429,24 @@ def parse_env_args(args):
         env[k] = v
     return FrozenNamespace(**env)
 
+def minimal_env(ctx):
+    if ctx.host.os == 'windows':
+        die('ERROR: --minimal-env is not supported yet on Windows')
+    path = '/usr/local/bin:/usr/bin:/bin'
+    if ctx.host.os == 'sunos':
+        path = '/usr/xpg4/bin:' + path
+    return {
+        'PATH': path,
+        'TMPDIR': '/tmp',
+        'HOME': '/homeless-shelter',
+        'USER': 'nobody',
+        'SHELL': '/bin/sh',
+        'LC_ALL': 'C.UTF-8',
+        'LANG': 'C.UTF-8',
+        'TZ': 'UTC',
+        'SOURCE_DATE_EPOCH': '0',
+    }
+
 def main():
     # Parse command line
     parser = argparse.ArgumentParser()
@@ -436,6 +455,7 @@ def main():
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose output')
     parser.add_argument('--env', action='append', default=[], help='set ctx.env.KEY to VALUE in rules.py evaluation environment', metavar='KEY=VALUE')
+    parser.add_argument('--minimal-env', action='store_true', help='experimental: give subprocesses a minimal execution environment by default')
     parser.add_argument('outputs', nargs='*', help='outputs to make')
     args = parser.parse_args()
     if args.jobs is None:
@@ -446,11 +466,14 @@ def main():
     cwd = os.getcwd()
     args.outputs = [normpath(joinpath(cwd, x)) for x in args.outputs]
 
-    # Set up task DB, reading in .make.db files as we go
+    # Set up EvalContext and task DB, reading in .make.db files as we go
     ctx = EvalContext()
     ctx.host = detect_host()
     ctx.env = parse_env_args(args.env)
     ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow tasks to access ~
+    if args.minimal_env: # use hermetic baseline instead of inherited environment
+        global default_subprocess_env
+        default_subprocess_env = minimal_env(ctx)
     visited = set()
     for f in args.files:
         eval_tasks_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
