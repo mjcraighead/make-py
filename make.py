@@ -43,7 +43,7 @@ tasks = {}
 make_db = {}
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
-priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when rule priorities are the same
+priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when task priorities are the same
 any_tasks_failed = False # global failure flag across all tasks in this run
 
 try:
@@ -82,19 +82,19 @@ else:
     def joinpath(cwd, path):
         return path if path[0] == '/' else f'{cwd}/{path}'
 
-def execute(rule, verbose):
+def execute(task, verbose):
     # Run command, capture/filter its output, and get its exit code.
     # XXX Do we want to add an additional check that all the targets must exist?
     try:
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
         # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
-        result = subprocess.run(rule.cmd, cwd=rule.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        result = subprocess.run(task.cmd, cwd=task.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         out = result.stdout.decode('utf-8', 'replace').strip() # Assumes UTF-8, but robust if not -- XXX consider changing out to bytes
         code = result.returncode
     except Exception as e:
         out = str(e)
         code = 1
-    if rule.msvc_show_includes:
+    if task.msvc_show_includes:
         # Parse MSVC /showIncludes output, skipping system headers
         r = re.compile(r'^Note: including file:\s*(.*)$')
         (deps, new_out) = (set(), [])
@@ -109,36 +109,36 @@ def execute(rule, verbose):
         out = '' if len(new_out) == 1 else '\n'.join(new_out) # drop lone "source.c" line printed by MSVC
 
         # Write a make-style depfile listing all included headers
-        tmp_path = f'{rule.depfile}.tmp'
-        parts = [f'{rule.targets[0]}:'] + sorted(deps) # we checked for only 1 target at rule create time
+        tmp_path = f'{task.depfile}.tmp'
+        parts = [f'{task.targets[0]}:'] + sorted(deps) # we checked for only 1 target at task declaration time
         open(tmp_path, 'w').write(' \\\n  '.join(parts) + '\n') # add line continuations and indentation
-        os.replace(tmp_path, rule.depfile)
-    elif rule.output_exclude:
-        r = re.compile(rule.output_exclude)
+        os.replace(tmp_path, task.depfile)
+    elif task.output_exclude:
+        r = re.compile(task.output_exclude)
         out = '\n'.join(line for line in out.splitlines() if not r.match(line))
 
-    built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in rule.targets)
+    built_text = 'Built %s.\n' % '\n  and '.join(repr(t) for t in task.targets)
     if show_progress_line: # need to precede "Built [...]" with erasing the current progress indicator
         built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
 
     if verbose or code:
         if os.name == 'nt':
-            quoted_cmd = subprocess.list2cmdline(rule.cmd)
+            quoted_cmd = subprocess.list2cmdline(task.cmd)
         else:
-            quoted_cmd = ' '.join(shlex.quote(x) for x in rule.cmd)
+            quoted_cmd = ' '.join(shlex.quote(x) for x in task.cmd)
         out = f'{quoted_cmd}\n{out}'.rstrip()
     if code:
         global any_tasks_failed
         any_tasks_failed = True
         event_queue.put(('log', f'{built_text}{out}\n\n'))
-        for t in rule.targets:
+        for t in task.targets:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(t)
         return False
 
-    local_make_db = make_db[rule.cwd]
-    signature = rule.signature()
-    for t in rule.targets:
+    local_make_db = make_db[task.cwd]
+    signature = task.signature()
+    for t in task.targets:
         assert t in local_make_db, t # make sure slot is already allocated
         local_make_db[t] = signature
     if out:
@@ -154,32 +154,32 @@ class WorkerThread(threading.Thread):
 
     def run(self):
         while not any_tasks_failed:
-            (priority, counter, rule) = task_queue.get()
-            if rule is None:
+            (priority, counter, task) = task_queue.get()
+            if task is None:
                 break
-            if rule.cmd is not None:
-                event_queue.put(('start', rule))
-                execute(rule, self.verbose)
-            event_queue.put(('finish', rule))
+            if task.cmd is not None:
+                event_queue.put(('start', task))
+                execute(task, self.verbose)
+            event_queue.put(('finish', task))
 
 def schedule(target, visited, enqueued, completed):
     if target in visited or target in completed:
         return
-    rule = tasks[target]
-    visited.update(rule.targets)
-    if rule in enqueued:
+    task = tasks[target]
+    visited.update(task.targets)
+    if task in enqueued:
         return
 
     # Recurse into dependencies and order-only deps and wait for them to complete
     # Never recurse into depfile deps here, as the .d file could be stale/garbage from a previous run
-    deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
-    for dep in itertools.chain(deps, rule.order_only_deps):
+    deps = [normpath(joinpath(task.cwd, x)) for x in task.deps]
+    for dep in itertools.chain(deps, task.order_only_deps):
         if dep in tasks:
             schedule(dep, visited, enqueued, completed)
         else:
             visited.add(dep)
             completed.add(dep)
-    if any(dep not in completed for dep in itertools.chain(deps, rule.order_only_deps)):
+    if any(dep not in completed for dep in itertools.chain(deps, task.order_only_deps)):
         return
 
     # Error if any of the deps does not exist -- they should always exist by this point
@@ -188,52 +188,52 @@ def schedule(target, visited, enqueued, completed):
         if dep_timestamp < 0:
             global any_tasks_failed
             any_tasks_failed = True
-            msg = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in rule.targets)} is nonexistent"
+            msg = f"ERROR: dependency {dep!r} of {' '.join(repr(t) for t in task.targets)} is nonexistent"
             if show_progress_line:
                 msg = '\r%s\r%s' % (' ' * usable_columns, msg)
             die(msg)
 
     # Do all targets exist, and are all of them at least as new as every single dep?
-    local_make_db = make_db[rule.cwd]
-    target_timestamp = min(get_timestamp_if_exists(t) for t in rule.targets) # oldest target timestamp, or -1.0 if any target is nonexistent
+    local_make_db = make_db[task.cwd]
+    target_timestamp = min(get_timestamp_if_exists(t) for t in task.targets) # oldest target timestamp, or -1.0 if any target is nonexistent
     if target_timestamp >= 0 and all(dep_timestamp <= target_timestamp for dep_timestamp in dep_timestamps):
-        # Is the rule's signature identical to the last time we ran it?
-        signature = rule.signature()
-        if all(local_make_db.get(t) == signature for t in rule.targets):
+        # Is the task's signature identical to the last time we ran it?
+        signature = task.signature()
+        if all(local_make_db.get(t) == signature for t in task.targets):
             # Parse the depfile, if present
             depfile_deps = []
-            if rule.depfile:
+            if task.depfile:
                 try:
-                    depfile_deps = open(rule.depfile).read().replace('\\\n', '')
+                    depfile_deps = open(task.depfile).read().replace('\\\n', '')
                     if '\\' in depfile_deps: # shlex.split is slow, don't use it unless we really need it
                         depfile_deps = shlex.split(depfile_deps)[1:]
                     else:
                         depfile_deps = depfile_deps.split()[1:]
-                    depfile_deps = [normpath(joinpath(rule.cwd, x)) for x in depfile_deps]
+                    depfile_deps = [normpath(joinpath(task.cwd, x)) for x in depfile_deps]
                 except FileNotFoundError:
                     depfile_deps = None # depfile was expected but missing -- always dirty
 
             # Do all depfile_deps exist, and are all targets at least as new as every single depfile_dep?
             if depfile_deps is not None and all(0 <= get_timestamp_if_exists(dep) <= target_timestamp for dep in depfile_deps):
-                completed.update(rule.targets)
+                completed.update(task.targets)
                 return # skip the task
 
-    # Remove stale targets immediately once this rule is marked dirty
-    for t in rule.targets:
+    # Remove stale targets immediately once this task is marked dirty
+    for t in task.targets:
         with contextlib.suppress(FileNotFoundError):
             os.unlink(t)
         assert t in local_make_db, t # make sure slot is already allocated
         local_make_db[t] = None
 
     # Ensure targets' parent directories exist
-    for t in rule.targets:
+    for t in task.targets:
         os.makedirs(os.path.dirname(t), exist_ok=True)
 
     # Enqueue this task to the worker threads -- note that PriorityQueue needs the sense of priority reversed
-    task_queue.put((-rule.priority, next(priority_queue_counter), rule))
-    enqueued.add(rule)
+    task_queue.put((-task.priority, next(priority_queue_counter), task))
+    enqueued.add(task)
 
-class Rule:
+class Task:
     def __init__(self, targets, deps, cwd, cmd, depfile, order_only_deps, msvc_show_includes, output_exclude, latency):
         self.targets = targets
         self.deps = deps
@@ -316,11 +316,11 @@ class EvalContext:
         if msvc_show_includes:
             assert len(outputs) == 1, outputs # we only support 1 target for msvc_show_includes
 
-        rule = Rule(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
+        task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
         for t in outputs:
             if t in tasks:
                 die(f'ERROR: multiple ways to build {t!r}')
-            tasks[t] = rule
+            tasks[t] = task
             if t not in make_db[cwd]:
                 make_db[cwd][t] = None # preallocate a slot for every possible target in the make_db before we launch the WorkerThreads
 
@@ -378,16 +378,16 @@ def parse_rules_py(ctx, verbose, pathname, visited):
 def propagate_latencies(target, latency, _active):
     if target in _active:
         die(f'ERROR: cycle detected involving {target!r}')
-    rule = tasks[target]
-    latency += rule.latency
-    if latency <= rule.priority:
-        return # nothing to do -- we are not increasing the priority of this rule
-    rule.priority = latency # update this rule's latency
+    task = tasks[target]
+    latency += task.latency
+    if latency <= task.priority:
+        return # nothing to do -- we are not increasing the priority of this task
+    task.priority = latency # update this task's latency
 
     # Recursively handle the dependencies, including order-only deps
     _active.add(target)
-    deps = [normpath(joinpath(rule.cwd, x)) for x in rule.deps]
-    for dep in itertools.chain(deps, rule.order_only_deps):
+    deps = [normpath(joinpath(task.cwd, x)) for x in task.deps]
+    for dep in itertools.chain(deps, task.order_only_deps):
         if dep in tasks:
             propagate_latencies(dep, latency, _active)
     _active.remove(target)
