@@ -109,10 +109,10 @@ def execute(rule, verbose):
         out = '' if len(new_out) == 1 else '\n'.join(new_out) # drop lone "source.c" line printed by MSVC
 
         # Write a make-style depfile listing all included headers
+        tmp_path = f'{rule.depfile}.tmp'
         parts = [f'{rule.targets[0]}:'] + sorted(deps) # we checked for only 1 target at rule create time
-        with open(f'{rule.depfile}.tmp', 'w') as f:
-            f.write(' \\\n  '.join(parts) + '\n') # add line continuations and indentation
-        os.replace(f'{rule.depfile}.tmp', rule.depfile)
+        open(tmp_path, 'w').write(' \\\n  '.join(parts) + '\n') # add line continuations and indentation
+        os.replace(tmp_path, rule.depfile)
     elif rule.output_exclude:
         r = re.compile(rule.output_exclude)
         out = '\n'.join(line for line in out.splitlines() if not r.match(line))
