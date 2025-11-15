@@ -333,7 +333,7 @@ class EvalContext:
 def validate_tasks_ast(tree, path):
     BANNED = (
         ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
-        ast.ImportFrom, # XXX ast.Import temporarily allowed here as a transitional aid for now
+        ast.Import, ast.ImportFrom,
         ast.With, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith,
         ast.Global, ast.Nonlocal, ast.Delete, ast.ClassDef,
         ast.Try, ast.Raise, ast.Yield, ast.YieldFrom, ast.Await,
@@ -344,10 +344,6 @@ def validate_tasks_ast(tree, path):
         lineno = getattr(node, 'lineno', '?')
         if isinstance(node, BANNED):
             raise SyntaxError(f'{type(node).__name__} not allowed in rules.py (file {path!r}, line {lineno})')
-        if isinstance(node, ast.Import):
-            for alias in node.names:
-                if alias.name not in {'os', 'platform'}:
-                    raise SyntaxError(f'Import of {alias.name!r} not allowed (file {path!r}, line {lineno})')
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
             raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
 
