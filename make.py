@@ -297,7 +297,7 @@ class EvalContext:
             assert order_only_inputs is None, order_only_inputs # phony rules cannot have order_only_inputs
             assert msvc_show_includes == False, msvc_show_includes # phony rules cannot set msvc_show_includes
             assert output_exclude is None, output_exclude # phony rules cannot set output_exclude
-            # XXX override latency = 0?
+            latency = 0 # no command, therefore zero execution latency
         else: # real rule -- has a command
             assert all(o.startswith('_out/') for o in outputs), outputs # real rule outputs must start with _out/
             assert isinstance(cmd, list), cmd # real rules must have a command, which is an argv list
