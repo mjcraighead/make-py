@@ -62,6 +62,9 @@ def die(msg):
     print(msg)
     sys.exit(1)
 
+def die_at(path, lineno, msg):
+    die(f'ERROR: {os.path.relpath(path, os.getcwd())}:{lineno}: {msg}')
+
 # Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
     try:
@@ -345,9 +348,9 @@ def validate_tasks_ast(tree, path):
     for node in ast.walk(tree):
         lineno = getattr(node, 'lineno', '?')
         if isinstance(node, BANNED):
-            raise SyntaxError(f'{type(node).__name__} not allowed in rules.py (file {path!r}, line {lineno})')
+            die_at(path, lineno, f'{type(node).__name__} not allowed')
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
-            raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
+            die_at(path, lineno, f'{type(node.value).__name__} literal not allowed')
 
 CTX_FIELDS = ('host', 'env', 'path', 'task', 'rule', 'cwd')
 SAFE_BUILTINS = (
@@ -371,7 +374,7 @@ def eval_tasks_py(ctx, verbose, pathname, visited):
 
     spec = importlib.util.spec_from_file_location(f'tasks{len(visited)}', pathname)
     if spec is None or spec.loader is None:
-        raise ImportError(f'Cannot import {pathname!r}')
+        die(f'ERROR: cannot import {pathname!r}')
     tasks_py_module = importlib.util.module_from_spec(spec)
     tasks_py_module.__dict__['__builtins__'] = safe_builtins
     spec.loader.exec_module(tasks_py_module)
