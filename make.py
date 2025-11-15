@@ -20,6 +20,7 @@
 
 import argparse
 import ast
+import builtins
 import contextlib
 import functools
 import hashlib
@@ -348,6 +349,15 @@ def validate_tasks_ast(tree, path):
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
             raise SyntaxError(f'{type(node.value).__name__} literal not allowed in rules.py (file {path!r}, line {lineno})')
 
+CTX_FIELDS = ('host', 'env', 'path', 'task', 'rule', 'cwd')
+SAFE_BUILTINS = (
+    'len', 'range', 'print', # essentials
+    'enumerate', 'zip', 'sorted', 'reversed', # common iteration helpers
+    'list', 'dict', 'set', 'tuple', 'frozenset', 'str', 'int', 'bool', # basic types/constructors
+    'abs', 'min', 'max', 'sum', 'any', 'all', 'repr', # math, logic, debug helpers
+)
+safe_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS}
+
 def eval_tasks_py(ctx, verbose, pathname, visited):
     if pathname in visited:
         return
@@ -363,6 +373,7 @@ def eval_tasks_py(ctx, verbose, pathname, visited):
     if spec is None or spec.loader is None:
         raise ImportError(f'Cannot import {pathname!r}')
     tasks_py_module = importlib.util.module_from_spec(spec)
+    tasks_py_module.__dict__['__builtins__'] = safe_builtins
     spec.loader.exec_module(tasks_py_module)
 
     dirname = os.path.dirname(pathname)
@@ -370,13 +381,14 @@ def eval_tasks_py(ctx, verbose, pathname, visited):
         make_db[dirname] = {}
         with contextlib.suppress(FileNotFoundError):
             make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/.make.db'))
+    ctx.cwd = dirname
+    frozen_ctx = FrozenNamespace(**{k: getattr(ctx, k) for k in CTX_FIELDS})
     if hasattr(tasks_py_module, 'submakes'):
         for f in tasks_py_module.submakes():
-            eval_tasks_py(ctx, verbose, normpath(joinpath(dirname, f)), visited)
+            eval_tasks_py(frozen_ctx, verbose, normpath(joinpath(dirname, f)), visited)
     for name in ['tasks', 'rules']: # evaluate modern API first, then legacy API if present
         if hasattr(tasks_py_module, name):
-            ctx.cwd = dirname
-            getattr(tasks_py_module, name)(ctx)
+            getattr(tasks_py_module, name)(frozen_ctx)
 
 def propagate_latencies(output, latency, _active):
     if output in _active:
