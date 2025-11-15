@@ -293,6 +293,7 @@ class EvalContext:
             outputs = [outputs]
         if cmd is None: # phony rule -- no command -- XXX do we want to support phony rules with commands?
             assert all(o.startswith(':') for o in outputs), outputs # phony rule outputs must start with :
+            assert not any('/' in o for o in outputs), outputs # phony rule outputs must not contain path separators
             assert depfile is None, depfile # phony rules cannot have depfiles
             assert order_only_inputs is None, order_only_inputs # phony rules cannot have order_only_inputs
             assert msvc_show_includes == False, msvc_show_includes # phony rules cannot set msvc_show_includes
@@ -446,11 +447,17 @@ def minimal_env(ctx):
             'SOURCE_DATE_EPOCH': '0',
         }
 
+def locate_tasks_py_dir(path):
+    for pattern in ['/_out/', '/:']: # look for standard and phony rules
+        i = path.rfind(pattern)
+        if i >= 0:
+            return path[:i] # tasks.py lives in the parent directory
+    die(f"ERROR: cannot locate rules.py for {path!r} without '_out' or ':name'")
+
 def main():
     # Parse command line
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clean', action='store_true', help='clean _out directories first')
-    parser.add_argument('-f', '--file', dest='files', action='append', help='specify the path to a rules.py file (default is "rules.py")', metavar='FILE')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose output')
     parser.add_argument('--env', action='append', default=[], help='set ctx.env.KEY to VALUE in rules.py evaluation environment', metavar='KEY=VALUE')
@@ -459,8 +466,6 @@ def main():
     args = parser.parse_args()
     if args.jobs is None:
         args.jobs = os.cpu_count() # default to one job per CPU
-    if args.files is None:
-        args.files = ['rules.py'] # default to "-f rules.py"
 
     cwd = os.getcwd()
     args.outputs = [normpath(joinpath(cwd, x)) for x in args.outputs]
@@ -474,8 +479,9 @@ def main():
         global default_subprocess_env
         default_subprocess_env = minimal_env(ctx)
     visited = set()
-    for f in args.files:
-        eval_tasks_py(ctx, args.verbose, normpath(joinpath(cwd, f)), visited)
+    for output in args.outputs:
+        tasks_py_dir = locate_tasks_py_dir(output)
+        eval_tasks_py(ctx, args.verbose, f'{tasks_py_dir}/rules.py', visited)
     for output in args.outputs:
         if output not in tasks:
             die(f'ERROR: no rule to make {output!r}')
