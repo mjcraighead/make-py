@@ -63,7 +63,7 @@ def die(msg):
     sys.exit(1)
 
 def die_at(path, lineno, msg):
-    die(f'ERROR: {os.path.relpath(path, os.getcwd())}:{lineno}: {msg}')
+    die(f'ERROR: {os.path.relpath(path)}:{lineno}: {msg}')
 
 # Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
