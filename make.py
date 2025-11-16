@@ -367,10 +367,10 @@ def validate_tasks_ast(tree, path):
 
 CTX_FIELDS = ('host', 'env', 'path', 'task', 'rule', 'cwd')
 SAFE_BUILTINS = (
-    'len', 'range', 'print', # essentials
+    'len', 'range', 'print', 'repr', # essentials and debugging
     'enumerate', 'zip', 'sorted', 'reversed', # common iteration helpers
     'list', 'dict', 'set', 'tuple', 'frozenset', 'str', 'int', 'bool', # basic types/constructors
-    'abs', 'min', 'max', 'sum', 'any', 'all', 'repr', # math, logic, debug helpers
+    'abs', 'min', 'max', 'sum', 'any', 'all', # math and logic
 )
 safe_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS}
 
