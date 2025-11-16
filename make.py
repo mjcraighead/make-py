@@ -176,19 +176,18 @@ def schedule(output, visited, enqueued, completed):
 
     # Recurse into inputs and order-only inputs and wait for them to complete
     # Never recurse into depfile inputs here, as the .d file could be stale/garbage from a previous run
-    inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
-    for input in itertools.chain(inputs, task.order_only_inputs):
+    for input in itertools.chain(task.inputs, task.order_only_inputs):
         if input in tasks:
             schedule(input, visited, enqueued, completed)
         else:
             visited.add(input)
             completed.add(input)
-    if any(input not in completed for input in itertools.chain(inputs, task.order_only_inputs)):
+    if any(input not in completed for input in itertools.chain(task.inputs, task.order_only_inputs)):
         return
 
     # Error if any of the inputs does not exist -- they should always exist by this point
-    input_timestamps = [get_timestamp_if_exists(input) for input in inputs]
-    for (input, input_timestamp) in zip(inputs, input_timestamps):
+    input_timestamps = [get_timestamp_if_exists(input) for input in task.inputs]
+    for (input, input_timestamp) in zip(task.inputs, input_timestamps):
         if input_timestamp < 0:
             global any_tasks_failed
             any_tasks_failed = True
@@ -317,7 +316,7 @@ class EvalContext:
         if not isinstance(inputs, list):
             assert isinstance(inputs, str) # we expect inputs to be either a str (a single input) or a list of inputs
             inputs = [inputs]
-        inputs = inputs.copy() # XXX would simplify a bunch of other logic to do normpath/joinpath here
+        inputs = [normpath(joinpath(cwd, x)) for x in inputs]
         if depfile is not None:
             assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the depfile)
             depfile = normpath(joinpath(cwd, depfile))
@@ -423,10 +422,9 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
     if output not in tasks:
         die(f'ERROR: no rule to make {output!r}')
     task = tasks[output]
-    inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
     _active.add(output)
-    for dep in itertools.chain(inputs, task.order_only_inputs):
-        discover_tasks(ctx, verbose, dep, visited_files, visited_dirs, _active)
+    for input in itertools.chain(task.inputs, task.order_only_inputs):
+        discover_tasks(ctx, verbose, input, visited_files, visited_dirs, _active)
     _active.remove(output)
 
 def propagate_latencies(output, latency):
@@ -434,11 +432,8 @@ def propagate_latencies(output, latency):
     latency += task.latency
     if latency <= task.priority:
         return # nothing to do -- we are not increasing the priority of this task
-    task.priority = latency # update this task's latency
-
-    # Recursively handle the inputs, including order-only inputs
-    inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
-    for input in itertools.chain(inputs, task.order_only_inputs):
+    task.priority = latency # update this task's latency and recurse
+    for input in itertools.chain(task.inputs, task.order_only_inputs):
         if input in tasks:
             propagate_latencies(input, latency)
 
