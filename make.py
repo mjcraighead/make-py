@@ -409,9 +409,10 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
         return
     visited_files.add(output)
 
+    # Locate and evaluate the tasks.py for this output (if we haven't already evaluated it)
     tasks_py_dir = locate_tasks_py_dir(output)
     if tasks_py_dir is None:
-        return # this is a source file, not an output file or a phony rule name
+        return # this is a source file, not an output file or a phony rule name -- we are done
     if tasks_py_dir not in visited_dirs:
         tasks_py_path = f'{tasks_py_dir}/tasks.py'
         if not os.path.exists(tasks_py_path):
@@ -419,13 +420,14 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
         eval_tasks_py(ctx, verbose, tasks_py_path, len(visited_dirs))
         visited_dirs.add(tasks_py_dir)
 
-    if output in tasks: # tempting to skip this check, but possible to have an invalid output at this step (caught later)
-        task = tasks[output]
-        inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
-        _active.add(output)
-        for dep in itertools.chain(inputs, task.order_only_inputs):
-            discover_tasks(ctx, verbose, dep, visited_files, visited_dirs, _active)
-        _active.remove(output)
+    if output not in tasks:
+        die(f'ERROR: no rule to make {output!r}')
+    task = tasks[output]
+    inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
+    _active.add(output)
+    for dep in itertools.chain(inputs, task.order_only_inputs):
+        discover_tasks(ctx, verbose, dep, visited_files, visited_dirs, _active)
+    _active.remove(output)
 
 def propagate_latencies(output, latency):
     task = tasks[output]
