@@ -317,7 +317,7 @@ class EvalContext:
         if not isinstance(inputs, list):
             assert isinstance(inputs, str) # we expect inputs to be either a str (a single input) or a list of inputs
             inputs = [inputs]
-        inputs = inputs.copy()
+        inputs = inputs.copy() # XXX would simplify a bunch of other logic to do normpath/joinpath here
         if depfile is not None:
             assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the depfile)
             depfile = normpath(joinpath(cwd, depfile))
@@ -370,18 +370,14 @@ SAFE_BUILTINS = (
 )
 safe_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS}
 
-def eval_tasks_py(ctx, verbose, pathname, visited):
-    if pathname in visited:
-        return
-    visited.add(pathname)
-
+def eval_tasks_py(ctx, verbose, pathname, index):
     if verbose:
         print(f'Parsing {pathname!r}...')
     source = open(pathname, encoding='utf-8').read()
     tree = ast.parse(source, filename=pathname)
     validate_tasks_ast(tree, pathname)
 
-    spec = importlib.util.spec_from_file_location(f'tasks{len(visited)}', pathname)
+    spec = importlib.util.spec_from_file_location(f'tasks{index}', pathname)
     if spec is None or spec.loader is None:
         die(f'ERROR: cannot import {pathname!r}')
     tasks_py_module = importlib.util.module_from_spec(spec)
@@ -395,16 +391,11 @@ def eval_tasks_py(ctx, verbose, pathname, visited):
             make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/.make.db'))
     ctx.cwd = dirname
     frozen_ctx = FrozenNamespace(**{k: getattr(ctx, k) for k in CTX_FIELDS})
-    if hasattr(tasks_py_module, 'submakes'):
-        for f in tasks_py_module.submakes():
-            eval_tasks_py(frozen_ctx, verbose, normpath(joinpath(dirname, f)), visited)
     for name in ['tasks', 'rules']: # evaluate modern API first, then legacy API if present
         if hasattr(tasks_py_module, name):
             getattr(tasks_py_module, name)(frozen_ctx)
 
-def propagate_latencies(output, latency, _active):
-    if output in _active:
-        die(f'ERROR: cycle detected involving {output!r}')
+def propagate_latencies(output, latency):
     task = tasks[output]
     latency += task.latency
     if latency <= task.priority:
@@ -412,12 +403,10 @@ def propagate_latencies(output, latency, _active):
     task.priority = latency # update this task's latency
 
     # Recursively handle the inputs, including order-only inputs
-    _active.add(output)
     inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
     for input in itertools.chain(inputs, task.order_only_inputs):
         if input in tasks:
-            propagate_latencies(input, latency, _active)
-    _active.remove(output)
+            propagate_latencies(input, latency)
 
 def drain_event_queue():
     while True:
@@ -476,7 +465,27 @@ def locate_tasks_py_dir(path):
         i = path.rfind(pattern)
         if i >= 0:
             return path[:i] # tasks.py lives in the parent directory
-    die(f"ERROR: cannot locate rules.py for {path!r} without '_out' or ':name'")
+    return None
+
+def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
+    if output in _active:
+        die(f'ERROR: cycle detected involving {output!r}')
+    if output in visited_files:
+        return
+    visited_files.add(output)
+    tasks_py_dir = locate_tasks_py_dir(output)
+    if tasks_py_dir is None:
+        return # this is a source file, not an output file or a phony rule name
+    if tasks_py_dir not in visited_dirs:
+        eval_tasks_py(ctx, verbose, f'{tasks_py_dir}/rules.py', len(visited_dirs))
+        visited_dirs.add(tasks_py_dir)
+    if output in tasks:
+        task = tasks[output]
+        inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
+        _active.add(output)
+        for dep in itertools.chain(inputs, task.order_only_inputs):
+            discover_tasks(ctx, verbose, dep, visited_files, visited_dirs, _active)
+        _active.remove(output)
 
 def main():
     # Parse command line
@@ -502,14 +511,13 @@ def main():
     if args.minimal_env: # use hermetic baseline instead of inherited environment
         global default_subprocess_env
         default_subprocess_env = minimal_env(ctx)
-    visited = set()
+    (visited_files, visited_dirs) = (set(), set())
     for output in args.outputs:
-        tasks_py_dir = locate_tasks_py_dir(output)
-        eval_tasks_py(ctx, args.verbose, f'{tasks_py_dir}/rules.py', visited)
+        discover_tasks(ctx, args.verbose, output, visited_files, visited_dirs, set())
     for output in args.outputs:
         if output not in tasks:
             die(f'ERROR: no rule to make {output!r}')
-        propagate_latencies(output, 0, set())
+        propagate_latencies(output, 0)
 
     # Clean up stale outputs from previous runs that no longer have tasks; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
