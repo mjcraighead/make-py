@@ -12,3 +12,4 @@ def rules(ctx):
     ctx.rule(exe_file, o_files, cmd=['gcc', '-o', exe_file] + o_files)
 
     ctx.rule(':build', exe_file)
+    ctx.rule(':all', ':build')

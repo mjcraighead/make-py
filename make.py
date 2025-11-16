@@ -189,12 +189,13 @@ def schedule(output, visited, enqueued, completed):
     input_timestamps = [get_timestamp_if_exists(input) for input in task.inputs]
     for (input, input_timestamp) in zip(task.inputs, input_timestamps):
         if input_timestamp < 0:
-            global any_tasks_failed
-            any_tasks_failed = True
-            msg = f"ERROR: input {input!r} of {' '.join(repr(output) for output in task.outputs)} is nonexistent"
-            if show_progress_line:
-                msg = '\r%s\r%s' % (' ' * usable_columns, msg)
-            die(msg)
+            if input not in tasks or tasks[input].cmd is not None: # source file or real (not phony) rule; do not check for phony rules
+                global any_tasks_failed
+                any_tasks_failed = True
+                msg = f"ERROR: input {input!r} of {' '.join(repr(output) for output in task.outputs)} is nonexistent"
+                if show_progress_line:
+                    msg = '\r%s\r%s' % (' ' * usable_columns, msg)
+                die(msg)
 
     # Do all outputs exist, and are all of them at least as new as every single input?
     local_make_db = make_db[task.cwd]
