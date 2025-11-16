@@ -218,8 +218,8 @@ def schedule(output, visited, enqueued, completed):
                     else:
                         depfile_inputs = depfile_inputs.split()[1:]
                     depfile_inputs = [normpath(joinpath(task.cwd, x)) for x in depfile_inputs]
-                except FileNotFoundError:
-                    depfile_inputs = None # depfile was expected but missing -- always dirty
+                except Exception: # catches FileNotFoundError but also anything else that went wrong in depfile parsing
+                    depfile_inputs = None # mark the rule dirty
 
             # Do all depfile_inputs exist, and are all outputs at least as new as every single depfile_input?
             if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(input) <= output_timestamp for input in depfile_inputs):
