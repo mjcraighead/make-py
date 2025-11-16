@@ -477,7 +477,10 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
     if tasks_py_dir is None:
         return # this is a source file, not an output file or a phony rule name
     if tasks_py_dir not in visited_dirs:
-        eval_tasks_py(ctx, verbose, f'{tasks_py_dir}/rules.py', len(visited_dirs))
+        tasks_py_path = f'{tasks_py_dir}/tasks.py'
+        if not os.path.exists(tasks_py_path):
+            tasks_py_path = f'{tasks_py_dir}/rules.py' # tasks.py is the canonical name, rules.py provided for familiarity
+        eval_tasks_py(ctx, verbose, tasks_py_path, len(visited_dirs))
         visited_dirs.add(tasks_py_dir)
     if output in tasks:
         task = tasks[output]
