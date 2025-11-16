@@ -13,7 +13,8 @@ but still **small enough to understand**.
 ### 🔄 Parallel builds, done right
 - Fully parallelized builds by default, using all available CPU cores.
 - The scheduler automatically prioritizes deep dependency chains to minimize idle time.
-- Works seamlessly across multiple `rules.py` files - no manual coordination needed.
+- Self-assembling build graph: discovers and loads only the `rules.py` files required for your requested targets.
+  - Zero manual coordination; fully automatic hierarchy traversal and dependency-graph construction.
 
 ### 🧠 Smart, minimal output
 - Interactive builds display a **real-time rolling progress indicator** that shows what's currently building and what's left.
