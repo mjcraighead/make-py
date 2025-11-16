@@ -61,10 +61,9 @@ while gaining the predictability and analyzability of a structured build DSL. In
 Python, and make.py keeps your build definitions clean, reproducible, and future-proof.
 
 ## 🚧 Planned Features
-- Optional SHA-256–based dependency tracking instead of timestamp comparisons.
-- Improved diagnostics for invalid rule definitions and dependency cycles.
-- Environment variable overrides in rule definitions.
-- More complete compatibility with other Starlark implementations and .bzl files.
+- Hermetic task environments by default (`--inherit-env` for legacy behavior).
+- Optional `--keep-going` mode for CI-style fault tolerance.
+- Environment variable overrides in rule definitions (with proper signature tracking).
 
 ## 🧾 Requirements
 Python 3.6 or newer
