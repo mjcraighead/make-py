@@ -212,14 +212,20 @@ def schedule(output, visited, enqueued, completed):
             depfile_inputs = []
             if task.depfile:
                 try:
-                    depfile_inputs = open(task.depfile).read().replace('\\\n', '')
+                    depfile_inputs = open(task.depfile, encoding='utf-8').read().replace('\\\n', '')
                     if '\\' in depfile_inputs: # shlex.split is slow, don't use it unless we really need it
                         depfile_inputs = shlex.split(depfile_inputs)[1:]
                     else:
                         depfile_inputs = depfile_inputs.split()[1:]
                     depfile_inputs = [normpath(joinpath(task.cwd, x)) for x in depfile_inputs]
-                except Exception: # catches FileNotFoundError but also anything else that went wrong in depfile parsing
-                    depfile_inputs = None # mark the rule dirty
+                except FileNotFoundError:
+                    depfile_inputs = None # depfile was expected but missing -- always dirty
+                except Exception: # anything else that went wrong
+                    msg = f"WARNING: malformed depfile for {' '.join(repr(output) for output in task.outputs)} (will rebuild)\n"
+                    if show_progress_line:
+                        msg = '\r%s\r%s' % (' ' * usable_columns, msg)
+                    event_queue.put(('log', msg))
+                    depfile_inputs = None
 
             # Do all depfile_inputs exist, and are all outputs at least as new as every single depfile_input?
             if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(input) <= output_timestamp for input in depfile_inputs):
