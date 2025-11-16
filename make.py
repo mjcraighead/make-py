@@ -112,7 +112,7 @@ def execute(task, verbose):
 
         # Write a make-style depfile listing all included headers
         tmp_path = f'{task.depfile}.tmp'
-        parts = [f'{task.outputs[0]}:'] + sorted(inputs) # we checked for only 1 output at task declaration time
+        parts = [f'{task.outputs[0]}:', *sorted(inputs)] # we checked for only 1 output at task declaration time
         open(tmp_path, 'w').write(' \\\n  '.join(parts) + '\n') # add line continuations and indentation
         os.replace(tmp_path, task.depfile)
     elif task.output_exclude:
