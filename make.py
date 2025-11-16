@@ -25,6 +25,7 @@ import contextlib
 import functools
 import hashlib
 import importlib.util
+import inspect
 import itertools
 import os
 import pickle
@@ -241,7 +242,7 @@ def schedule(output, visited, enqueued, completed):
     enqueued.add(task)
 
 class Task:
-    def __init__(self, outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency):
+    def __init__(self, outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency, path, lineno):
         self.outputs = outputs
         self.inputs = inputs
         self.cwd = cwd
@@ -252,6 +253,8 @@ class Task:
         self.output_exclude = output_exclude
         self.latency = latency
         self.priority = 0
+        self.path = path
+        self.lineno = lineno
 
     # output_exclude and priority are excluded from signatures because they do not affect the outputs' content.
     # outputs, inputs, and order_only_inputs are included since they alter DAG structure (and thus execution ordering and correctness).
@@ -324,10 +327,14 @@ class EvalContext:
         if msvc_show_includes:
             assert len(outputs) == 1, outputs # we only support 1 output for msvc_show_includes
 
-        task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency)
+        frame = inspect.currentframe().f_back
+        (path, lineno) = (frame.f_code.co_filename, frame.f_lineno)
+        task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency, path, lineno)
         for output in outputs:
             if output in tasks:
-                die(f'ERROR: multiple ways to make {output!r}')
+                die(f'ERROR: multiple tasks declare {output!r}:\n'
+                    f'  first declared at {os.path.relpath(tasks[output].path)}:{tasks[output].lineno}\n'
+                    f'  again declared at {os.path.relpath(path)}:{lineno}')
             tasks[output] = task
             if output not in make_db[cwd]:
                 make_db[cwd][output] = None # preallocate a slot for every possible output in the make_db before we launch the WorkerThreads
