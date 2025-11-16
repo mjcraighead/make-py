@@ -62,6 +62,10 @@ def die(msg):
 def die_at(path, lineno, msg):
     die(f'ERROR: {os.path.relpath(path)}:{lineno}: {msg}')
 
+def _expect(cond, path, lineno, msg):
+    if not cond:
+        die_at(path, lineno, msg)
+
 # Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
     try:
@@ -296,41 +300,40 @@ def detect_host():
 
 class EvalContext:
     def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
+        frame = inspect.currentframe().f_back
+        (path, lineno) = (frame.f_code.co_filename, frame.f_lineno)
         cwd = self.cwd
         if not isinstance(outputs, list):
-            assert isinstance(outputs, str) # we expect outputs to be either a str (a single output) or a list of outputs
+            _expect(isinstance(outputs, str), path, lineno, 'outputs must be either a str or a list')
             outputs = [outputs]
         if cmd is None: # phony rule -- no command -- XXX do we want to support phony rules with commands?
-            assert all(o.startswith(':') for o in outputs), outputs # phony rule outputs must start with :
-            assert not any('/' in o for o in outputs), outputs # phony rule outputs must not contain path separators
-            assert depfile is None, depfile # phony rules cannot have depfiles
-            assert order_only_inputs is None, order_only_inputs # phony rules cannot have order_only_inputs
-            assert msvc_show_includes == False, msvc_show_includes # phony rules cannot set msvc_show_includes
-            assert output_exclude is None, output_exclude # phony rules cannot set output_exclude
+            _expect(all(o.startswith(':') for o in outputs), path, lineno, 'phony rule outputs must start with :')
+            _expect(not any('/' in o for o in outputs), path, lineno, 'phony rule outputs must not contain path separators')
+            _expect(depfile is None, path, lineno, 'phony rules cannot have depfiles')
+            _expect(order_only_inputs is None, path, lineno, 'phony rules cannot have order_only_inputs')
+            _expect(msvc_show_includes == False, path, lineno, 'phony rules cannot set msvc_show_includes')
+            _expect(output_exclude is None, path, lineno, 'phony rules cannot set output_exclude')
             latency = 0 # no command, therefore zero execution latency
         else: # real rule -- has a command
-            assert all(o.startswith('_out/') for o in outputs), outputs # real rule outputs must start with _out/
-            assert isinstance(cmd, list), cmd # real rules must have a command, which is an argv list
-            assert all(isinstance(x, str) for x in cmd), cmd
+            _expect(all(o.startswith('_out/') for o in outputs), path, lineno, "rule output paths must start with '_out/'")
+            _expect(isinstance(cmd, list) and all(isinstance(x, str) for x in cmd), path, lineno, 'real rules must set cmd=[argv_list]')
             cmd = cmd.copy()
         outputs = [normpath(joinpath(cwd, x)) for x in outputs]
         if not isinstance(inputs, list):
-            assert isinstance(inputs, str) # we expect inputs to be either a str (a single input) or a list of inputs
+            _expect(isinstance(inputs, str), path, lineno, 'inputs must be either a str or a list')
             inputs = [inputs]
         inputs = [normpath(joinpath(cwd, x)) for x in inputs]
         if depfile is not None:
-            assert isinstance(depfile, str) # we expect depfile to be ether None or a str (the path of the depfile)
+            _expect(isinstance(depfile, str), path, lineno, 'depfile must be either None or a str')
             depfile = normpath(joinpath(cwd, depfile))
         if order_only_inputs is None:
             order_only_inputs = []
-        assert isinstance(order_only_inputs, list)
+        _expect(isinstance(order_only_inputs, list), path, lineno, 'order_only_inputs must be either None or a list')
         order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
-        assert output_exclude is None or isinstance(output_exclude, str)
+        _expect(output_exclude is None or isinstance(output_exclude, str), path, lineno, 'output_exclude must be either None or a str')
         if msvc_show_includes:
-            assert len(outputs) == 1, outputs # we only support 1 output for msvc_show_includes
+            _expect(len(outputs) == 1, path, lineno, 'msvc_show_includes requires only a single output')
 
-        frame = inspect.currentframe().f_back
-        (path, lineno) = (frame.f_code.co_filename, frame.f_lineno)
         task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency, path, lineno)
         for output in outputs:
             if output in tasks:
