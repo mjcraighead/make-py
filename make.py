@@ -395,6 +395,38 @@ def eval_tasks_py(ctx, verbose, pathname, index):
         if hasattr(tasks_py_module, name):
             getattr(tasks_py_module, name)(frozen_ctx)
 
+def locate_tasks_py_dir(path):
+    for pattern in ['/_out/', '/:']: # look for standard and phony rules
+        i = path.rfind(pattern)
+        if i >= 0:
+            return path[:i] # tasks.py lives in the parent directory
+    return None
+
+def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
+    if output in _active:
+        die(f'ERROR: cycle detected involving {output!r}')
+    if output in visited_files:
+        return
+    visited_files.add(output)
+
+    tasks_py_dir = locate_tasks_py_dir(output)
+    if tasks_py_dir is None:
+        return # this is a source file, not an output file or a phony rule name
+    if tasks_py_dir not in visited_dirs:
+        tasks_py_path = f'{tasks_py_dir}/tasks.py'
+        if not os.path.exists(tasks_py_path):
+            tasks_py_path = f'{tasks_py_dir}/rules.py' # tasks.py is the canonical name, rules.py provided for familiarity
+        eval_tasks_py(ctx, verbose, tasks_py_path, len(visited_dirs))
+        visited_dirs.add(tasks_py_dir)
+
+    if output in tasks: # tempting to skip this check, but possible to have an invalid output at this step (caught later)
+        task = tasks[output]
+        inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
+        _active.add(output)
+        for dep in itertools.chain(inputs, task.order_only_inputs):
+            discover_tasks(ctx, verbose, dep, visited_files, visited_dirs, _active)
+        _active.remove(output)
+
 def propagate_latencies(output, latency):
     task = tasks[output]
     latency += task.latency
@@ -459,36 +491,6 @@ def minimal_env(ctx):
             'TZ': 'UTC',
             'SOURCE_DATE_EPOCH': '0',
         }
-
-def locate_tasks_py_dir(path):
-    for pattern in ['/_out/', '/:']: # look for standard and phony rules
-        i = path.rfind(pattern)
-        if i >= 0:
-            return path[:i] # tasks.py lives in the parent directory
-    return None
-
-def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
-    if output in _active:
-        die(f'ERROR: cycle detected involving {output!r}')
-    if output in visited_files:
-        return
-    visited_files.add(output)
-    tasks_py_dir = locate_tasks_py_dir(output)
-    if tasks_py_dir is None:
-        return # this is a source file, not an output file or a phony rule name
-    if tasks_py_dir not in visited_dirs:
-        tasks_py_path = f'{tasks_py_dir}/tasks.py'
-        if not os.path.exists(tasks_py_path):
-            tasks_py_path = f'{tasks_py_dir}/rules.py' # tasks.py is the canonical name, rules.py provided for familiarity
-        eval_tasks_py(ctx, verbose, tasks_py_path, len(visited_dirs))
-        visited_dirs.add(tasks_py_dir)
-    if output in tasks:
-        task = tasks[output]
-        inputs = [normpath(joinpath(task.cwd, x)) for x in task.inputs]
-        _active.add(output)
-        for dep in itertools.chain(inputs, task.order_only_inputs):
-            discover_tasks(ctx, verbose, dep, visited_files, visited_dirs, _active)
-        _active.remove(output)
 
 def main():
     # Parse command line
