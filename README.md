@@ -48,20 +48,17 @@ but still **small enough to understand**.
 - Entire tool lives in a **single Python file (~600 lines)**.
 - No dependencies beyond Python itself (3.6+).
 
-## 🧱 Python with guardrails (evolving toward a Starlark-like subset)
+## 🧱 Python with guardrails — a Starlark-like subset
 `rules.py` files are real Python - just not *all* of Python.
 
-Inspired by Starlark, make.py runs AST checks to block
-constructs that could hang or make builds non-deterministic or unsafe to parallelize.
-For example, `while` and `lambda` are forbidden to ensure all programs terminate, and
-`async` is disallowed as unnecessary in this domain.
+Inspired by Starlark, make.py enforces a restricted Python subset to keep builds deterministic and parallel-safe.
+Constructs like `while`, `lambda`, and `async` are disallowed to guarantee termination, while `import` statements
+and most builtins are removed to prevent access to arbitrary system state. This ensures build rules remain
+*pure, hermetic, and analyzable* - a small, safe language within Python itself.
 
-Today, these restrictions are light - you can use nearly all normal Python, with limited imports (`os`, `platform`
-only) - but over time, the checks will tighten to define a well-specified, Starlark-like subset.
-
-The goal is to keep Python's flexibility and readability while gaining the predictability and analyzability of
-a structured build DSL. In practice, you write ordinary Python, and make.py keeps your build definitions clean,
-reproducible, and future-proof.
+*These restrictions aren't limitations, but design choices:* they keep Python's flexibility and readability
+while gaining the predictability and analyzability of a structured build DSL. In practice, you write ordinary
+Python, and make.py keeps your build definitions clean, reproducible, and future-proof.
 
 ## 🚧 Planned Features
 - Optional SHA-256–based dependency tracking instead of timestamp comparisons.
@@ -78,7 +75,7 @@ make.py aims to occupy a unique middle ground:
 - More deterministic and parallel than ad-hoc scripts.
 - Fully inspectable - you can read the whole thing in one sitting and know what your build system is doing.
 
-It treats builds as hermetic, deterministic processes - a simple, elegant idea that much heavier systems
+It treats builds as *hermetic, deterministic processes* - a simple, elegant idea that much heavier systems
 tend to obscure beneath layers of machinery that might not be necessary after all.
 
 When your build tool fits in a single file, *debugging* and *trust* become much easier.
