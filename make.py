@@ -221,10 +221,10 @@ def schedule(output, visited, enqueued, completed):
                 except FileNotFoundError:
                     depfile_inputs = None # depfile was expected but missing -- always dirty
                 except Exception: # anything else that went wrong
-                    msg = f"WARNING: malformed depfile for {' '.join(repr(output) for output in task.outputs)} (will rebuild)\n"
+                    msg = f"WARNING: malformed depfile for {' '.join(repr(output) for output in task.outputs)} (will rebuild)"
                     if show_progress_line:
                         msg = '\r%s\r%s' % (' ' * usable_columns, msg)
-                    event_queue.put(('log', msg))
+                    print(msg)
                     depfile_inputs = None
 
             # Do all depfile_inputs exist, and are all outputs at least as new as every single depfile_input?
