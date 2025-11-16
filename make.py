@@ -55,10 +55,6 @@ except OSError:
     usable_columns = None # stdout is not attached to a terminal
 show_progress_line = usable_columns is not None
 
-def stdout_write(x):
-    sys.stdout.write(x)
-    sys.stdout.flush() # always flush log writes immediately
-
 def die(msg):
     print(msg)
     sys.exit(1)
@@ -552,7 +548,8 @@ def main():
             # Be careful about iterating over data structures being edited concurrently by the WorkerThreads
             for (status, payload) in drain_event_queue():
                 if status == 'log':
-                    stdout_write(payload)
+                    sys.stdout.write(payload)
+                    sys.stdout.flush()
                 elif status == 'start':
                     running.add(payload)
                 else:
@@ -577,7 +574,8 @@ def main():
                     progress += '\b' * pad # put cursor back at end of line
                 else:
                     progress = progress[:usable_columns]
-                stdout_write('\r' + progress)
+                sys.stdout.write('\r' + progress)
+                sys.stdout.flush()
             if all(output in completed for output in args.outputs):
                 break
     finally:
