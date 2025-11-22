@@ -131,7 +131,7 @@ def execute(task, verbose):
         if os.name == 'nt':
             quoted_cmd = subprocess.list2cmdline(task.cmd)
         else:
-            quoted_cmd = ' '.join(shlex.quote(x) for x in task.cmd)
+            quoted_cmd = ' '.join(shlex.quote(x) for x in task.cmd) # XXX switch to shlex.join once we drop 3.6/3.7 support
         out = f'{quoted_cmd}\n{out}'.rstrip()
     if code:
         global any_tasks_failed
