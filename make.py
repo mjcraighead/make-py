@@ -254,12 +254,12 @@ class Task:
     __slots__ = ('outputs', 'inputs', 'cwd', 'cmd', 'depfile', 'order_only_inputs', 'msvc_show_includes', 'allow_output', 'output_exclude',
                  'latency', 'priority', 'path', 'lineno')
     def __init__(self, outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, allow_output, output_exclude, latency, path, lineno):
-        self.outputs = outputs
-        self.inputs = inputs
+        self.outputs = tuple(sorted(outputs)) # freeze lists into canonical tuples for downstream logic -- XXX upstream logic needs to ensure no duplicates
+        self.inputs = tuple(sorted(inputs))
         self.cwd = cwd
-        self.cmd = cmd
+        self.cmd = tuple(cmd) if cmd is not None else cmd
         self.depfile = depfile
-        self.order_only_inputs = order_only_inputs
+        self.order_only_inputs = tuple(sorted(order_only_inputs))
         self.msvc_show_includes = msvc_show_includes
         self.allow_output = allow_output
         self.output_exclude = output_exclude
