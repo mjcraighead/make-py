@@ -507,7 +507,7 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--minimal-env', action='store_true', help='use a minimal hermetic environment for subprocesses (future default)')
     group.add_argument('--inherit-env', action='store_true', help='explicitly inherit full host environment in subprocesses (current default)')
-    parser.add_argument('outputs', nargs='*', help='outputs to make')
+    parser.add_argument('outputs', nargs='+', help='outputs to make')
     args = parser.parse_args()
     if args.jobs is None:
         args.jobs = os.cpu_count() # default to one job per CPU
