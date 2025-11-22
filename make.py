@@ -360,15 +360,14 @@ BANNED = (
 )
 def validate_tasks_ast(tree, path):
     for node in ast.walk(tree):
-        lineno = getattr(node, 'lineno', '?')
         if isinstance(node, BANNED):
-            die_at(path, lineno, f'{type(node).__name__} not allowed')
+            die_at(path, node.lineno, f'{type(node).__name__} not allowed')
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-            die_at(path, lineno, 'float division (/) not allowed -- use // if you really mean integer division')
+            die_at(path, node.lineno, 'float division (/) not allowed -- use // if you really mean integer division')
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
-            die_at(path, lineno, 'exponentiation operator (**) not allowed')
+            die_at(path, node.lineno, 'exponentiation operator (**) not allowed')
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
-            die_at(path, lineno, f'{type(node.value).__name__} literal not allowed')
+            die_at(path, node.lineno, f'{type(node.value).__name__} literal not allowed')
 
 CTX_FIELDS = ('host', 'env', 'path', 'task', 'rule', 'cwd')
 SAFE_BUILTINS = (
