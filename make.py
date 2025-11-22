@@ -437,15 +437,14 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
         discover_tasks(ctx, verbose, input, visited_files, visited_dirs, _active)
     _active.remove(output)
 
-def propagate_latencies(output, latency):
-    task = tasks[output]
+def propagate_latencies(task, latency):
     latency += task.latency
     if latency <= task.priority:
         return # nothing to do -- we are not increasing the priority of this task
     task.priority = latency # update this task's latency and recurse
     for input in itertools.chain(task.inputs, task.order_only_inputs):
         if input in tasks:
-            propagate_latencies(input, latency)
+            propagate_latencies(tasks[input], latency)
 
 def drain_event_queue():
     while True:
@@ -531,7 +530,7 @@ def main():
     for output in args.outputs:
         if output not in tasks:
             die(f'ERROR: no rule to make {output!r}')
-        propagate_latencies(output, 0)
+        propagate_latencies(tasks[output], 0)
 
     # Clean up stale outputs from previous runs that no longer have tasks; also do an explicitly requested clean
     for (cwd, db) in make_db.items():
