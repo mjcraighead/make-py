@@ -323,7 +323,6 @@ class EvalContext:
         else: # real rule -- has a command
             _expect(all(o.startswith('_out/') for o in outputs), path, lineno, "rule output paths must start with '_out/'")
             _expect(isinstance(cmd, list) and all(isinstance(x, str) for x in cmd), path, lineno, 'real rules must set cmd=[argv_list]')
-            cmd = cmd.copy()
         outputs = [normpath(joinpath(cwd, x)) for x in outputs]
         if not isinstance(inputs, list):
             _expect(isinstance(inputs, str), path, lineno, 'inputs must be either a str or a list')
