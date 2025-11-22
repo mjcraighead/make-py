@@ -201,47 +201,48 @@ def schedule(output, visited, enqueued, completed):
                     msg = '\r%s\r%s' % (' ' * usable_columns, msg)
                 die(msg)
 
-    # Do all outputs exist, and are all of them at least as new as every single input?
-    local_make_db = make_db[task.cwd]
-    output_timestamp = min(get_timestamp_if_exists(output) for output in task.outputs) # oldest output timestamp, or -1.0 if any output is nonexistent
-    if output_timestamp >= 0 and all(input_timestamp <= output_timestamp for input_timestamp in input_timestamps):
-        # Is the task's signature identical to the last time we ran it?
-        signature = task.signature()
-        if all(local_make_db.get(output) == signature for output in task.outputs):
-            # Parse the depfile, if present
-            depfile_inputs = []
-            if task.depfile:
-                try:
-                    depfile_inputs = open(task.depfile, encoding='utf-8').read().replace('\\\n', '')
-                    if '\\' in depfile_inputs: # shlex.split is slow, don't use it unless we really need it
-                        depfile_inputs = shlex.split(depfile_inputs)[1:]
-                    else:
-                        depfile_inputs = depfile_inputs.split()[1:]
-                    depfile_inputs = [normpath(joinpath(task.cwd, x)) for x in depfile_inputs]
-                except FileNotFoundError:
-                    depfile_inputs = None # depfile was expected but missing -- always dirty
-                except Exception: # anything else that went wrong
-                    msg = f"WARNING: malformed depfile for {' '.join(repr(output) for output in task.outputs)} (will rebuild)"
-                    if show_progress_line:
-                        msg = '\r%s\r%s' % (' ' * usable_columns, msg)
-                    print(msg)
-                    depfile_inputs = None
+    if task.cmd is not None:
+        # Do all outputs exist, and are all of them at least as new as every single input?
+        local_make_db = make_db[task.cwd]
+        output_timestamp = min(get_timestamp_if_exists(output) for output in task.outputs) # oldest output timestamp, or -1.0 if any output is nonexistent
+        if output_timestamp >= 0 and all(input_timestamp <= output_timestamp for input_timestamp in input_timestamps):
+            # Is the task's signature identical to the last time we ran it?
+            signature = task.signature()
+            if all(local_make_db.get(output) == signature for output in task.outputs):
+                # Parse the depfile, if present
+                depfile_inputs = []
+                if task.depfile:
+                    try:
+                        depfile_inputs = open(task.depfile, encoding='utf-8').read().replace('\\\n', '')
+                        if '\\' in depfile_inputs: # shlex.split is slow, don't use it unless we really need it
+                            depfile_inputs = shlex.split(depfile_inputs)[1:]
+                        else:
+                            depfile_inputs = depfile_inputs.split()[1:]
+                        depfile_inputs = [normpath(joinpath(task.cwd, x)) for x in depfile_inputs]
+                    except FileNotFoundError:
+                        depfile_inputs = None # depfile was expected but missing -- always dirty
+                    except Exception: # anything else that went wrong
+                        msg = f"WARNING: malformed depfile for {' '.join(repr(output) for output in task.outputs)} (will rebuild)"
+                        if show_progress_line:
+                            msg = '\r%s\r%s' % (' ' * usable_columns, msg)
+                        print(msg)
+                        depfile_inputs = None
 
-            # Do all depfile_inputs exist, and are all outputs at least as new as every single depfile_input?
-            if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(input) <= output_timestamp for input in depfile_inputs):
-                completed.update(task.outputs)
-                return # skip the task
+                # Do all depfile_inputs exist, and are all outputs at least as new as every single depfile_input?
+                if depfile_inputs is not None and all(0 <= get_timestamp_if_exists(input) <= output_timestamp for input in depfile_inputs):
+                    completed.update(task.outputs)
+                    return # skip the task
 
-    # Remove stale outputs immediately once this task is marked dirty
-    for output in task.outputs:
-        with contextlib.suppress(FileNotFoundError):
-            os.unlink(output)
-        assert output in local_make_db, output # make sure slot is already allocated
-        local_make_db[output] = None
+        # Remove stale outputs immediately once this task is marked dirty
+        for output in task.outputs:
+            with contextlib.suppress(FileNotFoundError):
+                os.unlink(output)
+            assert output in local_make_db, output # make sure slot is already allocated
+            local_make_db[output] = None
 
-    # Ensure outputs' parent directories exist
-    for output in task.outputs:
-        os.makedirs(os.path.dirname(output), exist_ok=True)
+        # Ensure outputs' parent directories exist
+        for output in task.outputs:
+            os.makedirs(os.path.dirname(output), exist_ok=True)
 
     # Enqueue this task to the worker threads -- note that PriorityQueue needs the sense of priority reversed
     task_queue.put((-task.priority, next(priority_queue_counter), task))
