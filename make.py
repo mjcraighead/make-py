@@ -358,10 +358,13 @@ BANNED = (
     ast.Try, ast.Raise, ast.Yield, ast.YieldFrom, ast.Await,
     getattr(ast, 'NamedExpr', ()), # ast.NamedExpr exists only in 3.8+
 )
+BANNED_ATTRS = {'encode', 'translate', 'maketrans', 'to_bytes', 'from_bytes'} # ban attributes of str and int that don't make sense in our limited type system
 def validate_tasks_ast(tree, path):
     for node in ast.walk(tree):
         if isinstance(node, BANNED):
             die_at(path, node.lineno, f'{type(node).__name__} not allowed')
+        if isinstance(node, ast.Attribute) and (node.attr in BANNED_ATTRS or node.attr.startswith('__')):
+            die_at(path, node.lineno, f"access to '.{node.attr}' attribute not allowed")
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
             die_at(path, node.lineno, 'float division (/) not allowed -- use // if you really mean integer division')
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
