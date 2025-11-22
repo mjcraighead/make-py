@@ -95,7 +95,7 @@ def execute(task, verbose):
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
         # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
         result = subprocess.run(task.cmd, cwd=task.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=default_subprocess_env)
-        out = result.stdout.decode('utf-8', 'replace').rstrip() # Assumes UTF-8, but robust if not -- XXX consider changing out to bytes
+        out = result.stdout.decode('utf-8', 'replace') # Assumes UTF-8, but robust if not -- XXX consider changing out to bytes
         code = result.returncode
     except Exception as e:
         out = str(e)
@@ -104,7 +104,7 @@ def execute(task, verbose):
         # Parse MSVC /showIncludes output, skipping system headers
         r = re.compile(r'^Note: including file:\s*(.*)$')
         (inputs, new_out) = (set(), [])
-        for line in out.splitlines():
+        for line in out.rstrip().splitlines(): # XXX .rstrip() is probably not needed here
             m = r.match(line)
             if m:
                 input = normpath(m.group(1))
@@ -132,11 +132,11 @@ def execute(task, verbose):
             quoted_cmd = subprocess.list2cmdline(task.cmd)
         else:
             quoted_cmd = ' '.join(shlex.quote(x) for x in task.cmd) # XXX switch to shlex.join once we drop 3.6/3.7 support
-        out = f'{quoted_cmd}\n{out}'.rstrip()
+        out = f'{quoted_cmd}\n{out}'
     if code:
         global any_tasks_failed
         any_tasks_failed = True
-        event_queue.put(('log', f'{built_text}{out}\n\n'))
+        event_queue.put(('log', f'{built_text}{out.rstrip()}\n\n'))
         for output in task.outputs:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(output)
@@ -148,7 +148,7 @@ def execute(task, verbose):
         assert output in local_make_db, output # make sure slot is already allocated
         local_make_db[output] = signature
     if out:
-        event_queue.put(('log', f'{built_text}{out}\n\n'))
+        event_queue.put(('log', f'{built_text}{out.rstrip()}\n\n'))
     elif not show_progress_line:
         event_queue.put(('log', built_text))
     return True
