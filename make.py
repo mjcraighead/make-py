@@ -122,6 +122,8 @@ def execute(task, verbose):
     elif task.output_exclude:
         r = re.compile(task.output_exclude)
         out = '\n'.join(line for line in out.splitlines() if not r.match(line))
+    if out and not task.allow_output:
+        code = 1 # any output that hasn't been filtered by msvc_show_includes/output_exclude is an error unless explicitly declared otherwise
 
     built_text = 'Built %s.\n' % '\n  and '.join(repr(output) for output in task.outputs)
     if show_progress_line: # need to precede "Built [...]" with erasing the current progress indicator
@@ -249,9 +251,9 @@ def schedule(output, visited, enqueued, completed):
     enqueued.add(task)
 
 class Task:
-    __slots__ = ('outputs', 'inputs', 'cwd', 'cmd', 'depfile', 'order_only_inputs', 'msvc_show_includes', 'output_exclude',
+    __slots__ = ('outputs', 'inputs', 'cwd', 'cmd', 'depfile', 'order_only_inputs', 'msvc_show_includes', 'allow_output', 'output_exclude',
                  'latency', 'priority', 'path', 'lineno')
-    def __init__(self, outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency, path, lineno):
+    def __init__(self, outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, allow_output, output_exclude, latency, path, lineno):
         self.outputs = outputs
         self.inputs = inputs
         self.cwd = cwd
@@ -259,16 +261,17 @@ class Task:
         self.depfile = depfile
         self.order_only_inputs = order_only_inputs
         self.msvc_show_includes = msvc_show_includes
+        self.allow_output = allow_output
         self.output_exclude = output_exclude
         self.latency = latency
         self.priority = 0
         self.path = path
         self.lineno = lineno
 
-    # output_exclude and priority are excluded from signatures because they do not affect the outputs' content.
+    # latency/priority/path/lineno are excluded from signatures because they do not affect the outputs' content.
     # outputs, inputs, and order_only_inputs are included since they alter DAG structure (and thus execution ordering and correctness).
     def signature(self):
-        info = (self.outputs, self.inputs, self.cwd, self.cmd, self.depfile, self.order_only_inputs, self.msvc_show_includes)
+        info = (self.outputs, self.inputs, self.cwd, self.cmd, self.depfile, self.order_only_inputs, self.msvc_show_includes, self.allow_output, self.output_exclude)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
 
 class FrozenNamespace:
@@ -302,7 +305,7 @@ def detect_host():
     return FrozenNamespace(os=os_map[system], arch=arch_map[machine])
 
 class EvalContext:
-    def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, output_exclude=None, latency=1):
+    def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, allow_output=False, output_exclude=None, latency=1):
         frame = inspect.currentframe().f_back
         (path, lineno) = (frame.f_code.co_filename, frame.f_lineno)
         cwd = self.cwd
@@ -337,7 +340,7 @@ class EvalContext:
         if msvc_show_includes:
             _expect(len(outputs) == 1, path, lineno, 'msvc_show_includes requires only a single output')
 
-        task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency, path, lineno)
+        task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, allow_output, output_exclude, latency, path, lineno)
         for output in outputs:
             if output in tasks:
                 die(f'ERROR: multiple tasks declare {output!r}:\n'

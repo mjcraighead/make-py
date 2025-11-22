@@ -20,7 +20,9 @@ but still **small enough to understand**.
 - Interactive builds display a **real-time rolling progress indicator** that shows what's currently building and what's left.
   - When your code is warning-free, this is the *only* output you see - it even erases itself when the build completes.
   - Warnings and errors are captured and printed clearly apart from the progress indicator.
-- Regex-based filtering lets you suppress noisy tool output (e.g., `Generating code` messages).
+- Tasks are **silent by default**: any unexpected stdout causes the build to fail.
+  - Rules that legitimately produce text must declare `allow_output=True`, making build silence an explicit contract.
+  - Regex-based filtering lets you suppress noisy tool output (e.g., `Generating code` messages).
 - When stdout is redirected to a file, make.py automatically switches to a clean, non-interactive log format.
 
 ### 🧩 Reliable incremental builds
