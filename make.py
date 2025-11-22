@@ -348,16 +348,15 @@ class EvalContext:
     rule = task # ctx.task is the canonical interface, ctx.rule provided for familiarity
 
 # Reject disallowed constructs in tasks.py/rules.py -- a non-Turing-complete Starlark-like DSL
+BANNED = (
+    ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
+    ast.Import, ast.ImportFrom,
+    ast.With, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith,
+    ast.Global, ast.Nonlocal, ast.Delete, ast.ClassDef,
+    ast.Try, ast.Raise, ast.Yield, ast.YieldFrom, ast.Await,
+    getattr(ast, 'NamedExpr', ()), # ast.NamedExpr exists only in 3.8+
+)
 def validate_tasks_ast(tree, path):
-    BANNED = (
-        ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
-        ast.Import, ast.ImportFrom,
-        ast.With, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith,
-        ast.Global, ast.Nonlocal, ast.Delete, ast.ClassDef,
-        ast.Try, ast.Raise, ast.Yield, ast.YieldFrom, ast.Await,
-        getattr(ast, 'NamedExpr', ()), # ast.NamedExpr exists only in 3.8+
-    )
-
     for node in ast.walk(tree):
         lineno = getattr(node, 'lineno', '?')
         if isinstance(node, BANNED):
