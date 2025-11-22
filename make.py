@@ -358,7 +358,9 @@ BANNED = (
     ast.With, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith,
     ast.Global, ast.Nonlocal, ast.Delete, ast.ClassDef,
     ast.Try, ast.Raise, ast.Yield, ast.YieldFrom, ast.Await,
-    getattr(ast, 'NamedExpr', ()), # ast.NamedExpr exists only in 3.8+
+    getattr(ast, 'NamedExpr', ()), getattr(ast, 'Match', ()), getattr(ast, 'TryStar', ()), # Python feature additions in 3.8+, 3.10+, 3.11+ respectively
+    getattr(ast, 'TypeAlias', ()), getattr(ast, 'TypeVar', ()), getattr(ast, 'ParamSpec', ()), getattr(ast, 'TypeVarTuple', ()), # Python feature additions in 3.12+
+    getattr(ast, 'TemplateStr', ()), getattr(ast, 'Interpolation', ()), # Python feature additions in 3.14+
 )
 BANNED_ATTRS = {'encode', 'translate', 'maketrans', 'to_bytes', 'from_bytes'} # ban attributes of str and int that don't make sense in our limited type system
 def validate_tasks_ast(tree, path):

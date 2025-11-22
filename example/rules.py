@@ -1,4 +1,4 @@
-def rules(ctx):
+def rules(ctx: str):
     # Source files
     c_files = ['main.c']
 
