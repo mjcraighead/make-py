@@ -95,7 +95,7 @@ def execute(task, verbose):
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
         # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
         result = subprocess.run(task.cmd, cwd=task.cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=default_subprocess_env)
-        out = result.stdout.decode('utf-8', 'replace').strip() # Assumes UTF-8, but robust if not -- XXX consider changing out to bytes
+        out = result.stdout.decode('utf-8', 'replace').rstrip() # Assumes UTF-8, but robust if not -- XXX consider changing out to bytes
         code = result.returncode
     except Exception as e:
         out = str(e)
