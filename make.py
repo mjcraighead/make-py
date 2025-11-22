@@ -249,6 +249,8 @@ def schedule(output, visited, enqueued, completed):
     enqueued.add(task)
 
 class Task:
+    __slots__ = ('outputs', 'inputs', 'cwd', 'cmd', 'depfile', 'order_only_inputs', 'msvc_show_includes', 'output_exclude',
+                 'latency', 'priority', 'path', 'lineno')
     def __init__(self, outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, output_exclude, latency, path, lineno):
         self.outputs = outputs
         self.inputs = inputs
