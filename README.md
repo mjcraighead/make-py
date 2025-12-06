@@ -84,6 +84,6 @@ tend to obscure beneath layers of machinery that might not be necessary after al
 When your build tool fits in a single file, *debugging* and *trust* become much easier.
 
 ## 📜 License
-MIT License
-
 Copyright © 2012-2025 Matt Craighead
+
+Released under the terms of the MIT License — see [LICENSE](LICENSE) for details.
