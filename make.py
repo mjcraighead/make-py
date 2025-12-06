@@ -352,7 +352,7 @@ class EvalContext:
     rule = task # ctx.task is the canonical interface, ctx.rule provided for familiarity
 
 # Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
-BANNED = (
+BANNED_AST_NODES = (
     ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
     ast.Import, ast.ImportFrom,
     ast.With, ast.AsyncFunctionDef, ast.AsyncFor, ast.AsyncWith,
@@ -363,9 +363,9 @@ BANNED = (
     getattr(ast, 'TemplateStr', ()), getattr(ast, 'Interpolation', ()), # Python feature additions in 3.14+
 )
 BANNED_ATTRS = {'encode', 'translate', 'maketrans', 'to_bytes', 'from_bytes'} # ban attributes of str and int that don't make sense in our limited type system
-def validate_tasks_ast(tree, path):
+def validate_rules_py_ast(tree, path):
     for node in ast.walk(tree):
-        if isinstance(node, BANNED):
+        if isinstance(node, BANNED_AST_NODES):
             die_at(path, node.lineno, f'{type(node).__name__} not allowed')
         if isinstance(node, ast.Attribute) and (node.attr in BANNED_ATTRS or node.attr.startswith('__')):
             die_at(path, node.lineno, f"access to '.{node.attr}' attribute not allowed")
@@ -390,9 +390,9 @@ def eval_rules_py(ctx, verbose, pathname, index):
         print(f'Parsing {pathname!r}...')
     source = open(pathname, encoding='utf-8').read()
     tree = ast.parse(source, filename=pathname)
-    validate_tasks_ast(tree, pathname)
+    validate_rules_py_ast(tree, pathname)
 
-    spec = importlib.util.spec_from_file_location(f'tasks{index}', pathname)
+    spec = importlib.util.spec_from_file_location(f'rules{index}', pathname)
     if spec is None or spec.loader is None:
         die(f'ERROR: cannot import {pathname!r}')
     rules_py_module = importlib.util.module_from_spec(spec)
