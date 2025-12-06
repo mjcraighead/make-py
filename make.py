@@ -385,7 +385,7 @@ SAFE_BUILTINS = (
 )
 safe_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS}
 
-def eval_tasks_py(ctx, verbose, pathname, index):
+def eval_rules_py(ctx, verbose, pathname, index):
     if verbose:
         print(f'Parsing {pathname!r}...')
     source = open(pathname, encoding='utf-8').read()
@@ -395,9 +395,9 @@ def eval_tasks_py(ctx, verbose, pathname, index):
     spec = importlib.util.spec_from_file_location(f'tasks{index}', pathname)
     if spec is None or spec.loader is None:
         die(f'ERROR: cannot import {pathname!r}')
-    tasks_py_module = importlib.util.module_from_spec(spec)
-    tasks_py_module.__dict__['__builtins__'] = safe_builtins
-    spec.loader.exec_module(tasks_py_module)
+    rules_py_module = importlib.util.module_from_spec(spec)
+    rules_py_module.__dict__['__builtins__'] = safe_builtins
+    spec.loader.exec_module(rules_py_module)
 
     dirname = os.path.dirname(pathname)
     if dirname not in make_db:
@@ -407,10 +407,10 @@ def eval_tasks_py(ctx, verbose, pathname, index):
     ctx.cwd = dirname
     frozen_ctx = FrozenNamespace(**{k: getattr(ctx, k) for k in CTX_FIELDS})
     for name in ['tasks', 'rules']: # evaluate modern API first, then legacy API if present
-        if hasattr(tasks_py_module, name):
-            getattr(tasks_py_module, name)(frozen_ctx)
+        if hasattr(rules_py_module, name):
+            getattr(rules_py_module, name)(frozen_ctx)
 
-def locate_tasks_py_dir(path):
+def locate_rules_py_dir(path):
     for pattern in ['/_out/', '/:']: # look for standard and phony rules
         i = path.rfind(pattern)
         if i >= 0:
@@ -425,12 +425,12 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
     visited_files.add(output)
 
     # Locate and evaluate the rules.py for this output (if we haven't already evaluated it)
-    tasks_py_dir = locate_tasks_py_dir(output)
-    if tasks_py_dir is None:
+    rules_py_dir = locate_rules_py_dir(output)
+    if rules_py_dir is None:
         return # this is a source file, not an output file or a phony rule name -- we are done
-    if tasks_py_dir not in visited_dirs:
-        eval_tasks_py(ctx, verbose, f'{tasks_py_dir}/rules.py', len(visited_dirs))
-        visited_dirs.add(tasks_py_dir)
+    if rules_py_dir not in visited_dirs:
+        eval_rules_py(ctx, verbose, f'{rules_py_dir}/rules.py', len(visited_dirs))
+        visited_dirs.add(rules_py_dir)
 
     if output not in tasks:
         die(f'ERROR: no rule to make {output!r}')
