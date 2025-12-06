@@ -491,14 +491,13 @@ def minimal_env(ctx):
             path = '/usr/xpg4/bin:' + path
         return {
             'PATH': path,
-            'TMPDIR': '/tmp',
-            'HOME': '/homeless-shelter',
             'USER': 'nobody',
             'SHELL': '/bin/sh',
             'LC_ALL': 'C.UTF-8',
             'LANG': 'C.UTF-8',
             'TZ': 'UTC',
             'SOURCE_DATE_EPOCH': '0',
+            **{k: os.environ[k] for k in ['HOME', 'TMPDIR'] if k in os.environ}
         }
 
 def main():
