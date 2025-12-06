@@ -44,6 +44,7 @@ but still **small enough to understand**.
 ### 🌍 Environment handling
 - New `--minimal-env` option for hermetic subprocess environments:
   - On POSIX, provides a fixed minimal `PATH`, `HOME`, and locale (UTF-8, UTC).
+  - Sets `SOURCE_DATE_EPOCH=0`, which makes `__DATE__`/`__TIME__` in C/C++ compile reproducibly.
   - On Windows, injects only the minimal set of system variables needed to run toolchains.
 - `--env KEY=VALUE` exposes external config to `rules.py` as `ctx.env.KEY`, for per-host or per-distro customization.
 
