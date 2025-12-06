@@ -351,7 +351,7 @@ class EvalContext:
 
     rule = task # ctx.task is the canonical interface, ctx.rule provided for familiarity
 
-# Reject disallowed constructs in tasks.py/rules.py -- a non-Turing-complete Starlark-like DSL
+# Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
 BANNED = (
     ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
     ast.Import, ast.ImportFrom,
@@ -414,7 +414,7 @@ def locate_tasks_py_dir(path):
     for pattern in ['/_out/', '/:']: # look for standard and phony rules
         i = path.rfind(pattern)
         if i >= 0:
-            return path[:i] # tasks.py lives in the parent directory
+            return path[:i] # rules.py lives in the parent directory
     return None
 
 def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
@@ -424,15 +424,12 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
         return
     visited_files.add(output)
 
-    # Locate and evaluate the tasks.py for this output (if we haven't already evaluated it)
+    # Locate and evaluate the rules.py for this output (if we haven't already evaluated it)
     tasks_py_dir = locate_tasks_py_dir(output)
     if tasks_py_dir is None:
         return # this is a source file, not an output file or a phony rule name -- we are done
     if tasks_py_dir not in visited_dirs:
-        tasks_py_path = f'{tasks_py_dir}/tasks.py'
-        if not os.path.exists(tasks_py_path):
-            tasks_py_path = f'{tasks_py_dir}/rules.py' # tasks.py is the canonical name, rules.py provided for familiarity
-        eval_tasks_py(ctx, verbose, tasks_py_path, len(visited_dirs))
+        eval_tasks_py(ctx, verbose, f'{tasks_py_dir}/rules.py', len(visited_dirs))
         visited_dirs.add(tasks_py_dir)
 
     if output not in tasks:
