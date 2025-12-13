@@ -42,10 +42,11 @@ but still **small enough to understand**.
 - Built-in host detection (`ctx.host`) exposing normalized OS/architecture information for portable rules.
 
 ### 🌍 Environment handling
-- New `--minimal-env` option for hermetic subprocess environments:
+- Uses a hermetic subprocess environment by default:
   - On POSIX, provides a fixed minimal `PATH` and locale (UTF-8, UTC), while inheriting `HOME` and `TMPDIR` if already set.
   - Sets `SOURCE_DATE_EPOCH=0`, which makes `__DATE__`/`__TIME__` in C/C++ compile reproducibly.
   - On Windows, injects only the minimal set of system variables needed to run toolchains.
+  - Can fall back to inherited environment variables with `--inherit-env`.
 - `--env KEY=VALUE` exposes external config to `rules.py` as `ctx.env.KEY`, for per-host or per-distro customization.
 
 ### ⚙️ Lightweight by design
@@ -65,7 +66,6 @@ while gaining the predictability and analyzability of a structured build DSL. In
 Python, and make.py keeps your build definitions clean, reproducible, and future-proof.
 
 ## 🚧 Planned Features
-- Hermetic task environments by default (`--inherit-env` for legacy behavior).
 - Optional `--keep-going` mode for CI-style fault tolerance.
 - Environment variable overrides in rule definitions (with proper signature tracking).
 

@@ -48,7 +48,7 @@ task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
 priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when task priorities are the same
 any_tasks_failed = False # global failure flag across all tasks in this run
-default_subprocess_env = os.environ.copy() # default inherited env for subprocess.run
+default_subprocess_env = None # default inherited env for subprocess.run
 
 try:
     usable_columns = os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
@@ -509,8 +509,8 @@ def main():
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose output')
     parser.add_argument('--env', action='append', default=[], help='set ctx.env.KEY to VALUE in rules.py evaluation environment', metavar='KEY=VALUE')
     group = parser.add_mutually_exclusive_group()
-    group.add_argument('--minimal-env', action='store_true', help='use a minimal hermetic environment for subprocesses (future default)')
-    group.add_argument('--inherit-env', action='store_true', help='explicitly inherit full host environment in subprocesses (current default)')
+    group.add_argument('--minimal-env', action='store_true', help='use a minimal hermetic environment for subprocesses (default behavior, does nothing)')
+    group.add_argument('--inherit-env', action='store_true', help='explicitly inherit full host environment in subprocesses')
     parser.add_argument('outputs', nargs='+', help='outputs to make')
     args = parser.parse_args()
     if args.jobs is None:
@@ -524,9 +524,8 @@ def main():
     ctx.host = detect_host()
     ctx.env = parse_env_args(args.env)
     ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow tasks to access ~
-    if args.minimal_env: # use hermetic baseline instead of inherited environment
-        global default_subprocess_env
-        default_subprocess_env = minimal_env(ctx)
+    global default_subprocess_env
+    default_subprocess_env = os.environ.copy() if args.inherit_env else minimal_env(ctx) # use hermetic environment unless overridden by --inherit-env
     (visited_files, visited_dirs) = (set(), set())
     for output in args.outputs:
         discover_tasks(ctx, args.verbose, output, visited_files, visited_dirs, set())
