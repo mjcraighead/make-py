@@ -508,9 +508,7 @@ def main():
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose output')
     parser.add_argument('--env', action='append', default=[], help='set ctx.env.KEY to VALUE in rules.py evaluation environment', metavar='KEY=VALUE')
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--minimal-env', action='store_true', help='use a minimal hermetic environment for subprocesses (default behavior, does nothing)')
-    group.add_argument('--inherit-env', action='store_true', help='explicitly inherit full host environment in subprocesses')
+    parser.add_argument('--inherit-env', action='store_true', help='explicitly inherit full host environment in subprocesses')
     parser.add_argument('outputs', nargs='+', help='outputs to make')
     args = parser.parse_args()
     if args.jobs is None:
