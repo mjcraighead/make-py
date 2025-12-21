@@ -67,12 +67,12 @@ def _expect(cond, path, lineno, msg):
     if not cond:
         die_at(path, lineno, msg)
 
-# Query existence and modification time in one stat() call for better performance.
 def get_timestamp_if_exists(path):
+    """Return the modification time of 'path', or -1.0 if nonexistent, using only one stat() call."""
     try:
         return os.stat(path).st_mtime
     except FileNotFoundError:
-        return -1.0 # sentinel value: file does not exist
+        return -1.0
 
 if os.name == 'nt': # evaluate this condition only once, rather than per call, for performance
     @functools.lru_cache(maxsize=None)
@@ -90,7 +90,7 @@ else:
         return path if path[0] == '/' else f'{cwd}/{path}'
 
 def execute(task, verbose):
-    # Run command, capture/filter its output, and get its exit code.
+    """Run task command, capture/filter its output, update bookkeeping, and log to event_queue."""
     # XXX Do we want to add an additional check that all the outputs must exist?
     try:
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
