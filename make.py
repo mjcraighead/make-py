@@ -143,7 +143,7 @@ def execute(task, verbose):
         for output in task.outputs:
             with contextlib.suppress(FileNotFoundError):
                 os.unlink(output)
-        return False
+        return
 
     local_make_db = make_db[task.cwd]
     signature = task.signature()
@@ -154,7 +154,6 @@ def execute(task, verbose):
         event_queue.put(('log', f'{built_text}{out.rstrip()}\n\n'))
     elif not show_progress_line:
         event_queue.put(('log', built_text))
-    return True
 
 class WorkerThread(threading.Thread):
     def __init__(self, verbose):
