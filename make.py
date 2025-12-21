@@ -449,6 +449,7 @@ def propagate_latencies(task, latency):
         if input in tasks:
             propagate_latencies(tasks[input], latency)
 
+# XXX Consider making this function a generator that yields from event_queue
 def drain_event_queue():
     while True:
         try:
@@ -556,13 +557,13 @@ def main():
     # Main loop: schedule/execute tasks, report progress, and shut down as cleanly as possible if we get a Ctrl-C
     try:
         (enqueued, completed, running) = (set(), set(), set())
-        while True:
+        while not all(output in completed for output in args.outputs):
             # Enqueue tasks to the workers
             visited = set()
             for output in args.outputs:
                 schedule(output, visited, enqueued, completed)
             if all(output in completed for output in args.outputs):
-                break
+                break # schedule() may have marked more tasks completed
 
             # Handle events from worker threads, then show progress update and exit if done
             # Be careful about iterating over data structures being edited concurrently by the WorkerThreads
@@ -596,8 +597,6 @@ def main():
                     progress = progress[:usable_columns]
                 sys.stdout.write('\r' + progress)
                 sys.stdout.flush()
-            if all(output in completed for output in args.outputs):
-                break
     finally:
         # Shut down the system by sending sentinel tokens to all the threads
         for i in range(args.jobs):
