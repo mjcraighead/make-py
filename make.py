@@ -51,10 +51,9 @@ any_tasks_failed = False # global failure flag across all tasks in this run
 default_subprocess_env = None # default inherited env for subprocess.run
 
 try:
-    usable_columns = os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
+    progress_columns = os.get_terminal_size().columns - 1 # avoid last column to prevent line wrap
 except OSError:
-    usable_columns = None # stdout is not attached to a terminal
-show_progress_line = usable_columns is not None
+    progress_columns = None # stdout is not attached to a terminal
 
 def die(msg):
     print(msg)
@@ -127,8 +126,8 @@ def execute(task, verbose):
         code = 1 # any output that hasn't been filtered by msvc_show_includes/output_exclude is an error unless explicitly declared otherwise
 
     built_text = 'Built %s.\n' % '\n  and '.join(repr(output) for output in task.outputs)
-    if show_progress_line: # need to precede "Built [...]" with erasing the current progress indicator
-        built_text = '\r%s\r%s' % (' ' * usable_columns, built_text)
+    if progress_columns is not None: # need to precede "Built [...]" with erasing the current progress indicator
+        built_text = '\r%s\r%s' % (' ' * progress_columns, built_text)
 
     if verbose or code:
         if os.name == 'nt':
@@ -152,7 +151,7 @@ def execute(task, verbose):
         local_make_db[output] = signature
     if out:
         event_queue.put(('log', f'{built_text}{out.rstrip()}\n\n'))
-    elif not show_progress_line:
+    elif progress_columns is None:
         event_queue.put(('log', built_text))
 
 class WorkerThread(threading.Thread):
@@ -199,8 +198,8 @@ def schedule(output, visited, enqueued, completed):
                 global any_tasks_failed
                 any_tasks_failed = True
                 msg = f"ERROR: input {input!r} of {' '.join(repr(output) for output in task.outputs)} is nonexistent"
-                if show_progress_line:
-                    msg = '\r%s\r%s' % (' ' * usable_columns, msg)
+                if progress_columns is not None:
+                    msg = '\r%s\r%s' % (' ' * progress_columns, msg)
                 die(msg)
 
     if task.cmd is not None:
@@ -225,8 +224,8 @@ def schedule(output, visited, enqueued, completed):
                         depfile_inputs = None # depfile was expected but missing -- always dirty
                     except Exception: # anything else that went wrong
                         msg = f"WARNING: malformed depfile for {' '.join(repr(output) for output in task.outputs)} (will rebuild)"
-                        if show_progress_line:
-                            msg = '\r%s\r%s' % (' ' * usable_columns, msg)
+                        if progress_columns is not None:
+                            msg = '\r%s\r%s' % (' ' * progress_columns, msg)
                         print(msg)
                         depfile_inputs = None
 
@@ -579,7 +578,7 @@ def main():
                     completed.update(payload.outputs)
             if any_tasks_failed:
                 break
-            if show_progress_line:
+            if progress_columns is not None:
                 remaining_count = len((visited - completed) & tasks.keys())
                 if remaining_count:
                     def format_task_outputs(task):
@@ -589,12 +588,12 @@ def main():
                     progress = f'make.py: {remaining_count} left, building: {names}'
                 else:
                     progress = ''
-                if len(progress) < usable_columns:
-                    pad = usable_columns - len(progress)
+                if len(progress) < progress_columns:
+                    pad = progress_columns - len(progress)
                     progress += ' ' * pad # erase old contents
                     progress += '\b' * pad # put cursor back at end of line
                 else:
-                    progress = progress[:usable_columns]
+                    progress = progress[:progress_columns]
                 sys.stdout.write('\r' + progress)
                 sys.stdout.flush()
     finally:
