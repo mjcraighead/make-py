@@ -307,7 +307,10 @@ def detect_host():
 
 class EvalContext:
     def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, allow_output=False, output_exclude=None, latency=1):
-        frame = inspect.currentframe().f_back
+        frame = inspect.currentframe()
+        assert frame is not None
+        frame = frame.f_back
+        assert frame is not None
         (path, lineno) = (frame.f_code.co_filename, frame.f_lineno)
         cwd = self.cwd
         if not isinstance(outputs, list):
