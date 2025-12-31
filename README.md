@@ -53,6 +53,17 @@ but still **small enough to understand**.
 - Entire tool lives in a **single Python file (~600 lines)**.
 - No dependencies beyond Python itself (3.6+).
 
+## 🧬 Self-assembling dependency graph
+Unlike traditional build systems that require a single root build file or a full upfront analysis pass,
+make.py loads and evaluates only the `rules.py` files required by the requested outputs, assembling only
+the relevant portions of the global DAG.
+
+This design enables:
+- Near-instant startup even in large repositories
+- Naturally modular build definitions without central coordination
+- Correct global scheduling without recursive-make fragmentation
+- Precise builds that touch only what's needed for each invocation
+
 ## 🧱 Python with guardrails — a Starlark-like subset
 `rules.py` files are real Python - just not *all* of Python.
 
