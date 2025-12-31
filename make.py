@@ -67,7 +67,7 @@ def _expect(cond: bool, path: str, lineno: int, msg: str) -> None:
     if not cond:
         die_at(path, lineno, msg)
 
-def get_timestamp_if_exists(path):
+def get_timestamp_if_exists(path: str) -> float:
     """Return the modification time of 'path', or -1.0 if nonexistent, using only one stat() call."""
     try:
         return os.stat(path).st_mtime
@@ -76,17 +76,17 @@ def get_timestamp_if_exists(path):
 
 if os.name == 'nt': # evaluate this condition only once, rather than per call, for performance
     @functools.lru_cache(maxsize=None)
-    def normpath(path):
+    def normpath(path: str) -> str:
         return os.path.normpath(path).lower().replace('\\', '/')
 
-    def joinpath(cwd, path):
+    def joinpath(cwd: str, path: str) -> str:
         return path if (path[0] == '/' or path[1:2] == ':') else f'{cwd}/{path}'
 else:
     @functools.lru_cache(maxsize=None)
-    def normpath(path):
+    def normpath(path: str) -> str:
         return os.path.normpath(path)
 
-    def joinpath(cwd, path):
+    def joinpath(cwd: str, path: str) -> str:
         return path if path[0] == '/' else f'{cwd}/{path}'
 
 def execute(task, verbose):
