@@ -38,6 +38,7 @@ import shutil
 import subprocess
 import sys
 import threading
+from typing import NoReturn
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
@@ -55,14 +56,14 @@ try:
 except OSError:
     progress_columns = None # stdout is not attached to a terminal
 
-def die(msg):
+def die(msg: str) -> NoReturn:
     print(msg)
     sys.exit(1)
 
-def die_at(path, lineno, msg):
+def die_at(path: str, lineno: int, msg: str) -> NoReturn:
     die(f'ERROR: {os.path.relpath(path)}:{lineno}: {msg}')
 
-def _expect(cond, path, lineno, msg):
+def _expect(cond: bool, path: str, lineno: int, msg: str) -> None:
     if not cond:
         die_at(path, lineno, msg)
 
