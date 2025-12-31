@@ -510,8 +510,9 @@ def main():
     parser.add_argument('--inherit-env', action='store_true', help='explicitly inherit full host environment in subprocesses')
     parser.add_argument('outputs', nargs='+', help='outputs to make')
     args = parser.parse_args()
-    if args.jobs is None:
-        args.jobs = os.cpu_count() # default to one job per CPU
+    if args.jobs is not None and args.jobs < 1:
+        parser.error("--jobs must be >= 1")
+    jobs: int = args.jobs or os.cpu_count() or 1 # default to one job per CPU
 
     cwd = os.getcwd()
     args.outputs = [normpath(joinpath(cwd, x)) for x in args.outputs]
@@ -548,7 +549,7 @@ def main():
                 del db[output]
 
     # Create and start worker threads
-    threads = [WorkerThread(args.verbose) for i in range(args.jobs)]
+    threads = [WorkerThread(args.verbose) for i in range(jobs)]
     for t in threads:
         t.daemon = True # XXX this should probably be removed, but make sure Ctrl-C handling is correct
         t.start()
@@ -598,7 +599,7 @@ def main():
                 sys.stdout.flush()
     finally:
         # Shut down the system by sending sentinel tokens to all the threads
-        for i in range(args.jobs):
+        for i in range(jobs):
             task_queue.put((1000000, 0, None)) # lower priority than any real task
         for t in threads:
             t.join()
