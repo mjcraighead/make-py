@@ -371,7 +371,7 @@ BANNED_ATTRS = {'encode', 'translate', 'maketrans', 'to_bytes', 'from_bytes'} # 
 def validate_rules_py_ast(tree, path):
     for node in ast.walk(tree):
         if isinstance(node, BANNED_AST_NODES):
-            die_at(path, node.lineno, f'{type(node).__name__} not allowed')
+            die_at(path, node.lineno, f'{type(node).__name__} not allowed') # type: ignore[attr-defined]
         if isinstance(node, ast.Attribute) and (node.attr in BANNED_ATTRS or node.attr.startswith('__')):
             die_at(path, node.lineno, f"access to '.{node.attr}' attribute not allowed")
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
