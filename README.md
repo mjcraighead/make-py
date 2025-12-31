@@ -58,10 +58,10 @@ make.py loads and evaluates only the `rules.py` files required by the requested 
 the relevant portions of the global DAG.
 
 This design enables:
-- Near-instant startup even in large repositories
-- Naturally modular build definitions without central coordination
-- Correct global scheduling without recursive-make fragmentation
-- Precise builds that touch only what's needed for each invocation
+- Near-instant startup even in large repositories.
+- Naturally modular build definitions without central coordination.
+- Correct global scheduling without recursive-make fragmentation.
+- Precise builds that touch only what's needed for each invocation.
 
 ## 🧱 Python with guardrails — a Starlark-like subset
 `rules.py` files are real Python - just not *all* of Python.
