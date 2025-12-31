@@ -68,6 +68,9 @@ This design enables:
 `rules.py` files are real Python - just not *all* of Python.
 
 Inspired by Starlark, make.py enforces a restricted Python subset to keep builds deterministic and parallel-safe.
+Rather than implementing a custom interpreter or runtime, make.py evaluates rules using Python itself, trading
+strict sandboxing for simplicity, performance, and a small, auditable codebase.
+
 Constructs like `while`, `lambda`, and `async` are disallowed to guarantee termination, while `import` statements
 and most builtins are removed to prevent access to arbitrary system state. This ensures build rules remain
 *pure, hermetic, and analyzable* - a small, safe language within Python itself.
