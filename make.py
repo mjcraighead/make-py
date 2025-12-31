@@ -502,7 +502,6 @@ def minimal_env(ctx):
         }
 
 def main():
-    # Parse command line
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clean', action='store_true', help='clean _out directories first')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
@@ -514,9 +513,8 @@ def main():
     if args.jobs is not None and args.jobs < 1:
         parser.error("--jobs must be >= 1")
     jobs: int = args.jobs or os.cpu_count() or 1 # default to one job per CPU
-
     cwd = os.getcwd()
-    args.outputs = [normpath(joinpath(cwd, x)) for x in args.outputs]
+    outputs = [normpath(joinpath(cwd, x)) for x in args.outputs]
 
     # Set up EvalContext and task DB, reading in .make.db files as we go
     ctx = EvalContext()
@@ -526,9 +524,9 @@ def main():
     global default_subprocess_env
     default_subprocess_env = os.environ.copy() if args.inherit_env else minimal_env(ctx) # use hermetic environment unless overridden by --inherit-env
     (visited_files, visited_dirs) = (set(), set())
-    for output in args.outputs:
+    for output in outputs:
         discover_tasks(ctx, args.verbose, output, visited_files, visited_dirs, set())
-    for output in args.outputs:
+    for output in outputs:
         if output not in tasks:
             die(f'ERROR: no rule to make {output!r}')
         propagate_latencies(tasks[output], 0)
@@ -558,12 +556,12 @@ def main():
     # Main loop: schedule/execute tasks, report progress, and shut down as cleanly as possible if we get a Ctrl-C
     try:
         (enqueued, completed, running) = (set(), set(), set())
-        while not all(output in completed for output in args.outputs):
+        while not all(output in completed for output in outputs):
             # Enqueue tasks to the workers
             visited = set()
-            for output in args.outputs:
+            for output in outputs:
                 schedule(output, visited, enqueued, completed)
-            if all(output in completed for output in args.outputs):
+            if all(output in completed for output in outputs):
                 break # schedule() may have marked more tasks completed
 
             # Handle events from worker threads, then show progress update and exit if done
