@@ -411,12 +411,12 @@ def eval_rules_py(ctx, verbose, pathname, index):
             make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/.make.db'))
     ctx.cwd = dirname
     frozen_ctx = FrozenNamespace(**{k: getattr(ctx, k) for k in CTX_FIELDS})
-    for name in ['tasks', 'rules']: # evaluate modern API first, then legacy API if present
+    for name in ('tasks', 'rules'): # evaluate modern API first, then legacy API if present
         if hasattr(rules_py_module, name):
             getattr(rules_py_module, name)(frozen_ctx)
 
 def locate_rules_py_dir(path):
-    for pattern in ['/_out/', '/:']: # look for standard and phony rules
+    for pattern in ('/_out/', '/:'): # look for standard and phony rules
         i = path.rfind(pattern)
         if i >= 0:
             return path[:i] # rules.py lives in the parent directory
@@ -472,8 +472,8 @@ def drain_event_queue():
 
 def parse_env_args(args):
     if os.name == 'nt': # Windows: inject the smallest viable subset of os.environ needed to execute system tools
-        keys = ['ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
-                'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE']
+        keys = ('ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
+                'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE')
         env = {k: os.environ[k] for k in keys if k in os.environ}
     else:
         env = {} # POSIX: no injection; hermetic by default
@@ -488,8 +488,8 @@ def parse_env_args(args):
 
 def minimal_env(ctx):
     if ctx.host.os == 'windows': # currently identical to parse_env_args above, but may diverge if more are needed
-        keys = ['ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
-                'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE']
+        keys = ('ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
+                'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE')
         return {k: os.environ[k] for k in keys if k in os.environ}
     else:
         path = '/usr/local/bin:/usr/bin:/bin'
@@ -503,7 +503,7 @@ def minimal_env(ctx):
             'LANG': 'C.UTF-8',
             'TZ': 'UTC',
             'SOURCE_DATE_EPOCH': '0',
-            **{k: os.environ[k] for k in ['HOME', 'TMPDIR'] if k in os.environ}
+            **{k: os.environ[k] for k in ('HOME', 'TMPDIR') if k in os.environ}
         }
 
 def main():
