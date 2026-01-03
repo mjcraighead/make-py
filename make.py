@@ -270,7 +270,7 @@ class Task:
 
     # latency/priority/path/lineno are excluded from signatures because they do not affect the outputs' content.
     # outputs, inputs, and order_only_inputs are included since they alter DAG structure (and thus execution ordering and correctness).
-    def signature(self):
+    def signature(self) -> str:
         info = (self.outputs, self.inputs, self.cwd, self.cmd, self.depfile, self.order_only_inputs, self.msvc_show_includes, self.allow_output, self.output_exclude)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
 
