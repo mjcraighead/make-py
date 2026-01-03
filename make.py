@@ -286,8 +286,8 @@ class FrozenNamespace:
         items = ', '.join(f'{k}={v!r}' for k, v in self.__dict__.items())
         return f'{self.__class__.__name__}({items})'
 
-# make.py host detection: runs on any plausible system in 2026 with Python 3.6+.
-# ctx.host.os = OS ABI family (kernel/loader/libc), ctx.host.arch = CPU ISA family; together define the host ABI.
+# make.py canonicalized host ABI detection: runs on any plausible system in 2026 with Python 3.6+.
+# ctx.host.os = normalized OS ABI family (kernel/loader/libc), ctx.host.arch = normalized CPU ISA family.
 os_map = {
     'Windows': 'windows', 'Linux': 'linux', 'Darwin': 'darwin',
     'FreeBSD': 'freebsd', 'OpenBSD': 'openbsd', 'NetBSD': 'netbsd',

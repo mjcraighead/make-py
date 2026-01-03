@@ -38,7 +38,7 @@ but still **small enough to understand**.
 - Multi-target rules (one command generating multiple outputs).
 - Automatic creation of output directories.
 - Works on **Windows** (both Win32 and WSL), **Linux**, **macOS**, and other Unix systems (FreeBSD, etc.).
-- Built-in host detection (`ctx.host`) exposing normalized OS/architecture information for portable rules.
+- Built-in host detection (`ctx.host`) exposing normalized OS/architecture ABI information for portable rules.
 
 ### 🌍 Environment handling
 - Uses a hermetic subprocess environment by default:
