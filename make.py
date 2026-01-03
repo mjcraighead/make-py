@@ -38,7 +38,7 @@ import shutil
 import subprocess
 import sys
 import threading
-from typing import NoReturn
+from typing import NoReturn, Optional
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
@@ -415,7 +415,7 @@ def eval_rules_py(ctx, verbose, pathname, index) -> None:
         if hasattr(rules_py_module, name):
             getattr(rules_py_module, name)(frozen_ctx)
 
-def locate_rules_py_dir(path):
+def locate_rules_py_dir(path: str) -> Optional[str]:
     for pattern in ('/_out/', '/:'): # look for standard and phony rules
         i = path.rfind(pattern)
         if i >= 0:
