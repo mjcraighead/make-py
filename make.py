@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 #
 # make.py (https://github.com/mjcraighead/make-py)
-# Copyright (c) 2012-2025 Matt Craighead
+# Copyright (c) 2012-2026 Matt Craighead
 # SPDX-License-Identifier: MIT
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and
@@ -89,7 +89,7 @@ else:
     def joinpath(cwd: str, path: str) -> str:
         return path if path[0] == '/' else f'{cwd}/{path}'
 
-def execute(task, verbose):
+def execute(task, verbose) -> None:
     """Run task command, capture/filter its output, update bookkeeping, and log to event_queue."""
     # XXX Do we want to add an additional check that all the outputs must exist?
     try:
@@ -160,7 +160,7 @@ class WorkerThread(threading.Thread):
         super().__init__()
         self.verbose = verbose
 
-    def run(self):
+    def run(self) -> None:
         while not any_tasks_failed:
             (_, _, task) = task_queue.get()
             if task is None:
@@ -172,7 +172,7 @@ class WorkerThread(threading.Thread):
 
 # Note: external orchestrators may predeclare certain outputs as hermetically clean.
 # make.py treats such declarations as axiomatic -- they come from elsewhere.
-def schedule(output, visited, enqueued, completed):
+def schedule(output, visited, enqueued, completed) -> None:
     if output in visited or output in completed:
         return
     task = tasks[output]
@@ -286,7 +286,7 @@ class FrozenNamespace:
         items = ', '.join(f'{k}={v!r}' for k, v in self.__dict__.items())
         return f'{self.__class__.__name__}({items})'
 
-# make.py host detection: runs on any plausible system in 2025 with Python 3.6+.
+# make.py host detection: runs on any plausible system in 2026 with Python 3.6+.
 # ctx.host.os = OS ABI family (kernel/loader/libc), ctx.host.arch = CPU ISA family; together define the host ABI.
 os_map = {
     'Windows': 'windows', 'Linux': 'linux', 'Darwin': 'darwin',
@@ -307,7 +307,7 @@ def detect_host():
 
 class EvalContext:
     __slots__ = ('cwd', 'env', 'host', 'path')
-    def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, allow_output=False, output_exclude=None, latency=1):
+    def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, allow_output=False, output_exclude=None, latency=1) -> None:
         frame = inspect.currentframe()
         assert frame is not None
         frame = frame.f_back
@@ -368,7 +368,7 @@ BANNED_AST_NODES = (
     getattr(ast, 'TemplateStr', ()), getattr(ast, 'Interpolation', ()), # Python feature additions in 3.14+
 )
 BANNED_ATTRS = {'encode', 'translate', 'maketrans', 'to_bytes', 'from_bytes'} # ban attributes of str and int that don't make sense in our limited type system
-def validate_rules_py_ast(tree, path):
+def validate_rules_py_ast(tree, path) -> None:
     for node in ast.walk(tree):
         if isinstance(node, BANNED_AST_NODES):
             die_at(path, node.lineno, f'{type(node).__name__} not allowed') # type: ignore[attr-defined]
@@ -390,7 +390,7 @@ SAFE_BUILTINS = (
 )
 safe_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS}
 
-def eval_rules_py(ctx, verbose, pathname, index):
+def eval_rules_py(ctx, verbose, pathname, index) -> None:
     if verbose:
         print(f'Parsing {pathname!r}...')
     source = open(pathname, encoding='utf-8').read()
@@ -422,7 +422,7 @@ def locate_rules_py_dir(path):
             return path[:i] # rules.py lives in the parent directory
     return None
 
-def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
+def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active) -> None:
     if output in _active:
         die(f'ERROR: cycle detected involving {output!r}')
     if output in visited_files:
@@ -445,7 +445,7 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active):
         discover_tasks(ctx, verbose, input, visited_files, visited_dirs, _active)
     _active.remove(output)
 
-def propagate_latencies(task, latency):
+def propagate_latencies(task, latency) -> None:
     latency += task.latency
     if latency <= task.priority:
         return # nothing to do -- we are not increasing the priority of this task
@@ -506,7 +506,7 @@ def minimal_env(ctx):
             **{k: os.environ[k] for k in ('HOME', 'TMPDIR') if k in os.environ}
         }
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--clean', action='store_true', help='clean _out directories first')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
