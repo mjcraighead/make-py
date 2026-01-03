@@ -282,7 +282,7 @@ class FrozenNamespace:
         raise AttributeError(f'{self.__class__.__name__} is read-only')
     def __delattr__(self, k):
         raise AttributeError(f'{self.__class__.__name__} is read-only')
-    def __repr__(self):
+    def __repr__(self) -> str:
         items = ', '.join(f'{k}={v!r}' for k, v in self.__dict__.items())
         return f'{self.__class__.__name__}({items})'
 
