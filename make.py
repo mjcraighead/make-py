@@ -307,7 +307,8 @@ def detect_host():
 
 class EvalContext:
     __slots__ = ('cwd', 'env', 'host', 'path')
-    def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None, msvc_show_includes=False, allow_output=False, output_exclude=None, latency=1) -> None:
+    def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None,
+             msvc_show_includes=False, allow_output=False, output_exclude=None, latency=1) -> None:
         frame = inspect.currentframe()
         assert frame is not None
         frame = frame.f_back
