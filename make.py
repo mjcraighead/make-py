@@ -254,7 +254,7 @@ class Task:
     __slots__ = ('outputs', 'inputs', 'cwd', 'cmd', 'depfile', 'order_only_inputs', 'msvc_show_includes', 'allow_output', 'output_exclude',
                  'latency', 'priority', 'path', 'lineno')
     def __init__(self, outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, allow_output, output_exclude, latency, path, lineno):
-        self.outputs = tuple(sorted(outputs)) # freeze lists into canonical tuples for downstream logic -- XXX upstream logic needs to ensure no duplicates
+        self.outputs = tuple(sorted(outputs)) # freeze lists into canonical tuples for downstream logic
         self.inputs = tuple(sorted(inputs))
         self.cwd = cwd
         self.cmd = tuple(cmd) if cmd is not None else cmd
@@ -330,10 +330,12 @@ class EvalContext:
             _expect(all(o.startswith('_out/') for o in outputs), path, lineno, "rule output paths must start with '_out/'")
             _expect(isinstance(cmd, list) and all(isinstance(x, str) for x in cmd), path, lineno, 'real rules must set cmd=[argv_list]')
         outputs = [normpath(joinpath(cwd, x)) for x in outputs]
+        _expect(len(outputs) == len(set(outputs)), path, lineno, 'outputs contains duplicate paths')
         if not isinstance(inputs, list):
             _expect(isinstance(inputs, str), path, lineno, 'inputs must be either a str or a list')
             inputs = [inputs]
         inputs = [normpath(joinpath(cwd, x)) for x in inputs]
+        _expect(len(inputs) == len(set(inputs)), path, lineno, 'inputs contains duplicate paths')
         if depfile is not None:
             _expect(isinstance(depfile, str), path, lineno, 'depfile must be either None or a str')
             depfile = normpath(joinpath(cwd, depfile))
@@ -341,6 +343,7 @@ class EvalContext:
             order_only_inputs = []
         _expect(isinstance(order_only_inputs, list), path, lineno, 'order_only_inputs must be either None or a list')
         order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
+        _expect(len(order_only_inputs) == len(set(order_only_inputs)), path, lineno, 'order_only_inputs contains duplicate paths')
         _expect(output_exclude is None or isinstance(output_exclude, str), path, lineno, 'output_exclude must be either None or a str')
         if msvc_show_includes:
             _expect(len(outputs) == 1, path, lineno, 'msvc_show_includes requires only a single output')
