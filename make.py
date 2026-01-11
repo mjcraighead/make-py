@@ -459,10 +459,10 @@ def propagate_latencies(task, latency) -> None:
             propagate_latencies(tasks[input], latency)
 
 def drain_event_queue():
+    """Drain and yield all pending event_queue entries; blocks until at least one is available."""
     while True:
         try:
-            # Warning: this blocks KeyboardInterrupt during the timeout on Windows
-            yield event_queue.get(timeout=0.05 if os.name == 'nt' else None)
+            yield event_queue.get(timeout=0.05 if os.name == 'nt' else None) # note: blocks Ctrl-C for up to 0.05s on Windows
             break
         except queue.Empty:
             continue # keep trying until we get at least one event (only hit on Windows)
