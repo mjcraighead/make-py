@@ -83,7 +83,13 @@ Python, and make.py keeps your build definitions clean, reproducible, and future
 - Environment variable overrides in rule definitions (with proper signature tracking).
 
 ## 🧾 Requirements
-Python 3.6 or newer
+Python 3.6 or newer.
+
+*Planned change:* Support for Python 3.6 and 3.7 is planned to be dropped as of January 1, 2027, with
+Python 3.8 becoming the minimum required version.
+
+This change is being announced in advance to accommodate users on long-lived or vendor-managed systems.
+No changes will be made to the minimum Python version before that date.
 
 ## 🧭 Philosophy
 make.py aims to occupy a unique middle ground:
