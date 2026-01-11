@@ -458,21 +458,19 @@ def propagate_latencies(task, latency) -> None:
         if input in tasks:
             propagate_latencies(tasks[input], latency)
 
-# XXX Consider making this function a generator that yields from event_queue
 def drain_event_queue():
     while True:
         try:
             # Warning: this blocks KeyboardInterrupt during the timeout on Windows
-            events = [event_queue.get(timeout=0.05 if os.name == 'nt' else None)]
+            yield event_queue.get(timeout=0.05 if os.name == 'nt' else None)
             break
         except queue.Empty:
             continue # keep trying until we get at least one event (only hit on Windows)
     while True:
         try:
-            events.append(event_queue.get_nowait())
+            yield event_queue.get_nowait()
         except queue.Empty:
             break
-    return events
 
 def parse_env_args(args):
     if os.name == 'nt': # Windows: inject the smallest viable subset of os.environ needed to execute system tools
