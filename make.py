@@ -574,15 +574,15 @@ def main() -> None:
             # Handle events from worker threads, then show progress update and exit if done
             # Be careful about iterating over data structures being edited concurrently by the WorkerThreads
             for (status, payload) in drain_event_queue():
-                if status == 'log':
-                    sys.stdout.write(payload)
-                    sys.stdout.flush()
-                elif status == 'start':
+                if status == 'start':
                     running.add(payload)
-                else:
-                    assert status == 'finish', status
+                elif status == 'finish':
                     running.discard(payload)
                     completed.update(payload.outputs)
+                else:
+                    assert status == 'log', status
+                    sys.stdout.write(payload)
+                    sys.stdout.flush()
             if any_tasks_failed:
                 break
             if progress_columns is not None:
