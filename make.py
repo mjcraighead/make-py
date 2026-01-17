@@ -60,12 +60,9 @@ def die(msg: str) -> NoReturn:
     print(msg)
     sys.exit(1)
 
-def die_at(path: str, lineno: int, msg: str) -> NoReturn:
-    die(f'ERROR: {os.path.relpath(path)}:{lineno}: {msg}')
-
 def _expect(cond: bool, path: str, lineno: int, msg: str) -> None:
     if not cond:
-        die_at(path, lineno, msg)
+        die(f'ERROR: {os.path.relpath(path)}:{lineno}: {msg}')
 
 def get_timestamp_if_exists(path: str) -> float:
     """Return the modification time of 'path', or -1.0 if nonexistent, using only one stat() call."""
@@ -375,15 +372,15 @@ BANNED_ATTRS = {'encode', 'translate', 'maketrans', 'to_bytes', 'from_bytes'} # 
 def validate_rules_py_ast(tree, path) -> None:
     for node in ast.walk(tree):
         if isinstance(node, BANNED_AST_NODES):
-            die_at(path, node.lineno, f'{type(node).__name__} not allowed') # type: ignore[attr-defined]
+            _expect(False, path, node.lineno, f'{type(node).__name__} not allowed') # type: ignore[attr-defined]
         if isinstance(node, ast.Attribute) and (node.attr in BANNED_ATTRS or node.attr.startswith('__')):
-            die_at(path, node.lineno, f"access to '.{node.attr}' attribute not allowed")
+            _expect(False, path, node.lineno, f"access to '.{node.attr}' attribute not allowed")
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-            die_at(path, node.lineno, 'float division (/) not allowed -- use // if you really mean integer division')
+            _expect(False, path, node.lineno, 'float division (/) not allowed -- use // if you really mean integer division')
         if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
-            die_at(path, node.lineno, 'exponentiation operator (**) not allowed')
+            _expect(False, path, node.lineno, 'exponentiation operator (**) not allowed')
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
-            die_at(path, node.lineno, f'{type(node.value).__name__} literal not allowed')
+            _expect(False, path, node.lineno, f'{type(node.value).__name__} literal not allowed')
 
 CTX_FIELDS = ('host', 'env', 'path', 'task', 'rule', 'cwd')
 SAFE_BUILTINS = (
