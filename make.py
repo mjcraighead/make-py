@@ -315,7 +315,7 @@ class EvalContext:
         if not isinstance(outputs, list):
             _expect(isinstance(outputs, str), path, lineno, 'outputs must be either a str or a list')
             outputs = [outputs]
-        if cmd is None: # phony rule -- no command -- XXX do we want to support phony rules with commands?
+        if cmd is None: # phony rule -- not allowed to have commands
             _expect(all(o.startswith(':') for o in outputs), path, lineno, 'phony rule outputs must start with :')
             _expect(not any('/' in o for o in outputs), path, lineno, 'phony rule outputs must not contain path separators')
             _expect(depfile is None, path, lineno, 'phony rules cannot have depfiles')
@@ -323,7 +323,7 @@ class EvalContext:
             _expect(msvc_show_includes == False, path, lineno, 'phony rules cannot set msvc_show_includes')
             _expect(output_exclude is None, path, lineno, 'phony rules cannot set output_exclude')
             latency = 0 # no command, therefore zero execution latency
-        else: # real rule -- has a command
+        else: # real rule -- must have a command
             _expect(all(o.startswith('_out/') for o in outputs), path, lineno, "rule output paths must start with '_out/'")
             _expect(isinstance(cmd, list) and all(isinstance(x, str) for x in cmd), path, lineno, 'real rules must set cmd=[argv_list]')
         outputs = [normpath(joinpath(cwd, x)) for x in outputs]
