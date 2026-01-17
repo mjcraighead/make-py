@@ -88,7 +88,7 @@ else:
 
 def execute(task, verbose) -> None:
     """Run task command, capture/filter its output, update bookkeeping, and log to event_queue."""
-    # XXX Do we want to add an additional check that all the outputs must exist?
+    # Output file existence is not checked here; missing outputs are detected in schedule() when they are consumed as inputs.
     try:
         # Historical note: before Python 3.4 on Windows, subprocess.Popen() calls could inherit unrelated file handles
         # from other threads, leading to very strange file locking errors.  Fixed by: https://peps.python.org/pep-0446/
