@@ -554,7 +554,7 @@ def main() -> None:
     # Create and start worker threads
     threads = [WorkerThread(args.verbose) for i in range(jobs)]
     for t in threads:
-        t.daemon = True # XXX this should probably be removed, but make sure Ctrl-C handling is correct
+        t.daemon = True # Design note: daemon threads act as a safety net to guarantee process exit if shutdown/join fails.
         t.start()
 
     # Main loop: schedule/execute tasks, report progress, and shut down as cleanly as possible if we get a Ctrl-C
