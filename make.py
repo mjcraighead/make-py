@@ -153,7 +153,7 @@ def execute(task, verbose) -> None:
         event_queue.put(('log', built_text))
 
 class WorkerThread(threading.Thread):
-    def __init__(self, verbose):
+    def __init__(self, verbose: bool):
         super().__init__()
         self.verbose = verbose
 
