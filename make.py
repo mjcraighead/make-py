@@ -607,9 +607,8 @@ def main() -> None:
         for t in threads:
             t.join()
 
-        # Write out the final .make.db files
-        # XXX May want to do this "occasionally" as tasks are running?  (not too often to avoid a perf hit, but often
-        # enough to avoid data loss)
+        # Write out the final .make.db files (checkpoint at shutdown)
+        # Design note: an append-only journal would be an interesting alternative to improve crash resilience.
         for (cwd, db) in make_db.items():
             db = {output: signature for (output, signature) in db.items() if signature is not None} # remove None tombstones
             if db:
