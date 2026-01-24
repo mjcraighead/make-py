@@ -304,7 +304,7 @@ def detect_host():
 
 class EvalContext:
     __slots__ = ('cwd', 'env', 'host', 'path')
-    def task(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None,
+    def rule(self, outputs, inputs, *, cmd=None, depfile=None, order_only_inputs=None,
              msvc_show_includes=False, allow_output=False, output_exclude=None, latency=1) -> None:
         frame = inspect.currentframe()
         assert frame is not None
@@ -355,8 +355,6 @@ class EvalContext:
             if output not in make_db[cwd]:
                 make_db[cwd][output] = None # preallocate a slot for every possible output in the make_db before we launch the WorkerThreads
 
-    rule = task # ctx.task is the canonical interface, ctx.rule provided for familiarity
-
 # Reject disallowed constructs in rules.py -- a non-Turing-complete Starlark-like DSL
 BANNED_AST_NODES = (
     ast.While, ast.Lambda, # prevent infinite loops and infinite recursion
@@ -381,7 +379,7 @@ def validate_rules_py_ast(tree, path) -> None:
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
             _expect(False, path, node.lineno, f'{type(node.value).__name__} literal not allowed')
 
-CTX_FIELDS = ('host', 'env', 'path', 'task', 'rule', 'cwd')
+CTX_FIELDS = ('host', 'env', 'path', 'rule', 'cwd')
 SAFE_BUILTINS = (
     'len', 'range', 'print', 'repr', # essentials and debugging
     'enumerate', 'zip', 'sorted', 'reversed', # common iteration helpers
@@ -411,9 +409,7 @@ def eval_rules_py(ctx, verbose, pathname, index) -> None:
             make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/.make.db'))
     ctx.cwd = dirname
     frozen_ctx = FrozenNamespace(**{k: getattr(ctx, k) for k in CTX_FIELDS})
-    for name in ('tasks', 'rules'): # evaluate modern API first, then legacy API if present
-        if hasattr(rules_py_module, name):
-            getattr(rules_py_module, name)(frozen_ctx)
+    rules_py_module.rules(frozen_ctx)
 
 def locate_rules_py_dir(path: str) -> Optional[str]:
     for pattern in ('/_out/', '/:'): # look for standard and phony rules
