@@ -60,7 +60,7 @@ def die(msg: str) -> NoReturn:
     print(msg)
     sys.exit(1)
 
-def _expect(cond: bool, path: str, lineno: int, msg: str) -> None:
+def expect(cond: bool, path: str, lineno: int, msg: str) -> None:
     if not cond:
         die(f'ERROR: {os.path.relpath(path)}:{lineno}: {msg}')
 
@@ -313,37 +313,37 @@ class EvalContext:
         (path, lineno) = (frame.f_code.co_filename, frame.f_lineno)
         cwd = self.cwd
         if not isinstance(outputs, list):
-            _expect(isinstance(outputs, str), path, lineno, 'outputs must be either a str or a list')
+            expect(isinstance(outputs, str), path, lineno, 'outputs must be either a str or a list')
             outputs = [outputs]
         if cmd is None: # phony rule -- not allowed to have commands
-            _expect(all(o.startswith(':') for o in outputs), path, lineno, 'phony rule outputs must start with :')
-            _expect(not any('/' in o for o in outputs), path, lineno, 'phony rule outputs must not contain path separators')
-            _expect(depfile is None, path, lineno, 'phony rules cannot have depfiles')
-            _expect(order_only_inputs is None, path, lineno, 'phony rules cannot have order_only_inputs')
-            _expect(msvc_show_includes == False, path, lineno, 'phony rules cannot set msvc_show_includes')
-            _expect(output_exclude is None, path, lineno, 'phony rules cannot set output_exclude')
+            expect(all(o.startswith(':') for o in outputs), path, lineno, 'phony rule outputs must start with :')
+            expect(not any('/' in o for o in outputs), path, lineno, 'phony rule outputs must not contain path separators')
+            expect(depfile is None, path, lineno, 'phony rules cannot have depfiles')
+            expect(order_only_inputs is None, path, lineno, 'phony rules cannot have order_only_inputs')
+            expect(msvc_show_includes == False, path, lineno, 'phony rules cannot set msvc_show_includes')
+            expect(output_exclude is None, path, lineno, 'phony rules cannot set output_exclude')
             latency = 0 # no command, therefore zero execution latency
         else: # real rule -- must have a command
-            _expect(all(o.startswith('_out/') for o in outputs), path, lineno, "rule output paths must start with '_out/'")
-            _expect(isinstance(cmd, list) and all(isinstance(x, str) for x in cmd), path, lineno, 'real rules must set cmd=[argv_list]')
+            expect(all(o.startswith('_out/') for o in outputs), path, lineno, "rule output paths must start with '_out/'")
+            expect(isinstance(cmd, list) and all(isinstance(x, str) for x in cmd), path, lineno, 'real rules must set cmd=[argv_list]')
         outputs = [normpath(joinpath(cwd, x)) for x in outputs]
-        _expect(len(outputs) == len(set(outputs)), path, lineno, 'outputs contains duplicate paths')
+        expect(len(outputs) == len(set(outputs)), path, lineno, 'outputs contains duplicate paths')
         if not isinstance(inputs, list):
-            _expect(isinstance(inputs, str), path, lineno, 'inputs must be either a str or a list')
+            expect(isinstance(inputs, str), path, lineno, 'inputs must be either a str or a list')
             inputs = [inputs]
         inputs = [normpath(joinpath(cwd, x)) for x in inputs]
-        _expect(len(inputs) == len(set(inputs)), path, lineno, 'inputs contains duplicate paths')
+        expect(len(inputs) == len(set(inputs)), path, lineno, 'inputs contains duplicate paths')
         if depfile is not None:
-            _expect(isinstance(depfile, str), path, lineno, 'depfile must be either None or a str')
+            expect(isinstance(depfile, str), path, lineno, 'depfile must be either None or a str')
             depfile = normpath(joinpath(cwd, depfile))
         if order_only_inputs is None:
             order_only_inputs = []
-        _expect(isinstance(order_only_inputs, list), path, lineno, 'order_only_inputs must be either None or a list')
+        expect(isinstance(order_only_inputs, list), path, lineno, 'order_only_inputs must be either None or a list')
         order_only_inputs = [normpath(joinpath(cwd, x)) for x in order_only_inputs]
-        _expect(len(order_only_inputs) == len(set(order_only_inputs)), path, lineno, 'order_only_inputs contains duplicate paths')
-        _expect(output_exclude is None or isinstance(output_exclude, str), path, lineno, 'output_exclude must be either None or a str')
+        expect(len(order_only_inputs) == len(set(order_only_inputs)), path, lineno, 'order_only_inputs contains duplicate paths')
+        expect(output_exclude is None or isinstance(output_exclude, str), path, lineno, 'output_exclude must be either None or a str')
         if msvc_show_includes:
-            _expect(len(outputs) == 1, path, lineno, 'msvc_show_includes requires only a single output')
+            expect(len(outputs) == 1, path, lineno, 'msvc_show_includes requires only a single output')
 
         task = Task(outputs, inputs, cwd, cmd, depfile, order_only_inputs, msvc_show_includes, allow_output, output_exclude, latency, path, lineno)
         for output in outputs:
@@ -370,14 +370,14 @@ BANNED_ATTRS = {'encode', 'translate', 'maketrans', 'to_bytes', 'from_bytes'} # 
 def validate_rules_py_ast(tree, path: str) -> None:
     for node in ast.walk(tree):
         if isinstance(node, BANNED_AST_NODES):
-            _expect(False, path, node.lineno, f'{type(node).__name__} not allowed') # type: ignore[attr-defined]
+            expect(False, path, node.lineno, f'{type(node).__name__} not allowed') # type: ignore[attr-defined]
         if isinstance(node, ast.Attribute) and (node.attr in BANNED_ATTRS or node.attr.startswith('__')):
-            _expect(False, path, node.lineno, f"access to '.{node.attr}' attribute not allowed")
+            expect(False, path, node.lineno, f"access to '.{node.attr}' attribute not allowed")
         if isinstance(node, ast.BinOp):
-            _expect(not isinstance(node.op, ast.Div), path, node.lineno, 'float division (/) not allowed -- use // if you really mean integer division')
-            _expect(not isinstance(node.op, ast.Pow), path, node.lineno, 'exponentiation operator (**) not allowed')
+            expect(not isinstance(node.op, ast.Div), path, node.lineno, 'float division (/) not allowed -- use // if you really mean integer division')
+            expect(not isinstance(node.op, ast.Pow), path, node.lineno, 'exponentiation operator (**) not allowed')
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
-            _expect(False, path, node.lineno, f'{type(node.value).__name__} literal not allowed')
+            expect(False, path, node.lineno, f'{type(node.value).__name__} literal not allowed')
 
 CTX_FIELDS = ('host', 'env', 'path', 'rule', 'cwd')
 SAFE_BUILTINS = (
