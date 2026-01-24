@@ -418,7 +418,7 @@ def locate_rules_py_dir(path: str) -> Optional[str]:
             return path[:i] # rules.py lives in the parent directory
     return None
 
-def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active) -> None:
+def discover_rules(ctx, verbose, output, visited_files, visited_dirs, _active) -> None:
     if output in _active:
         die(f'ERROR: cycle detected involving {output!r}')
     if output in visited_files:
@@ -438,7 +438,7 @@ def discover_tasks(ctx, verbose, output, visited_files, visited_dirs, _active) -
     task = tasks[output]
     _active.add(output)
     for input in itertools.chain(task.inputs, task.order_only_inputs):
-        discover_tasks(ctx, verbose, input, visited_files, visited_dirs, _active)
+        discover_rules(ctx, verbose, input, visited_files, visited_dirs, _active)
     _active.remove(output)
 
 def propagate_latencies(task, latency) -> None:
@@ -524,7 +524,7 @@ def main() -> None:
     default_subprocess_env = os.environ.copy() if args.inherit_env else minimal_env(ctx) # use hermetic environment unless overridden by --inherit-env
     (visited_files, visited_dirs) = (set(), set())
     for output in outputs:
-        discover_tasks(ctx, args.verbose, output, visited_files, visited_dirs, set())
+        discover_rules(ctx, args.verbose, output, visited_files, visited_dirs, set())
     for output in outputs:
         if output not in tasks:
             die(f'ERROR: no rule to make {output!r}')
