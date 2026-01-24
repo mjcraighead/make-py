@@ -375,10 +375,9 @@ def validate_rules_py_ast(tree, path) -> None:
             _expect(False, path, node.lineno, f'{type(node).__name__} not allowed') # type: ignore[attr-defined]
         if isinstance(node, ast.Attribute) and (node.attr in BANNED_ATTRS or node.attr.startswith('__')):
             _expect(False, path, node.lineno, f"access to '.{node.attr}' attribute not allowed")
-        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Div):
-            _expect(False, path, node.lineno, 'float division (/) not allowed -- use // if you really mean integer division')
-        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Pow):
-            _expect(False, path, node.lineno, 'exponentiation operator (**) not allowed')
+        if isinstance(node, ast.BinOp):
+            _expect(not isinstance(node.op, ast.Div), path, node.lineno, 'float division (/) not allowed -- use // if you really mean integer division')
+            _expect(not isinstance(node.op, ast.Pow), path, node.lineno, 'exponentiation operator (**) not allowed')
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
             _expect(False, path, node.lineno, f'{type(node.value).__name__} literal not allowed')
 
