@@ -86,7 +86,7 @@ else:
     def joinpath(cwd: str, path: str) -> str:
         return path if path[0] == '/' else f'{cwd}/{path}'
 
-def execute(task, verbose) -> None:
+def execute(task, verbose: bool) -> None:
     """Run task command, capture/filter its output, update bookkeeping, and log to event_queue."""
     # Output file existence is not checked here; missing outputs are detected in schedule() when they are consumed as inputs.
     try:
@@ -169,7 +169,7 @@ class WorkerThread(threading.Thread):
 
 # Note: external orchestrators may predeclare certain outputs as hermetically clean.
 # make.py treats such declarations as axiomatic -- they come from elsewhere.
-def schedule(output, visited, enqueued, completed) -> None:
+def schedule(output: str, visited, enqueued, completed) -> None:
     if output in visited or output in completed:
         return
     task = tasks[output]
@@ -367,7 +367,7 @@ BANNED_AST_NODES = (
     getattr(ast, 'TemplateStr', ()), getattr(ast, 'Interpolation', ()), # Python feature additions in 3.14+
 )
 BANNED_ATTRS = {'encode', 'translate', 'maketrans', 'to_bytes', 'from_bytes'} # ban attributes of str and int that don't make sense in our limited type system
-def validate_rules_py_ast(tree, path) -> None:
+def validate_rules_py_ast(tree, path: str) -> None:
     for node in ast.walk(tree):
         if isinstance(node, BANNED_AST_NODES):
             _expect(False, path, node.lineno, f'{type(node).__name__} not allowed') # type: ignore[attr-defined]
@@ -388,7 +388,7 @@ SAFE_BUILTINS = (
 )
 safe_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS}
 
-def eval_rules_py(ctx, verbose, pathname, index) -> None:
+def eval_rules_py(ctx, verbose: bool, pathname: str, index: int) -> None:
     if verbose:
         print(f'Parsing {pathname!r}...')
     source = open(pathname, encoding='utf-8').read()
@@ -418,7 +418,7 @@ def locate_rules_py_dir(path: str) -> Optional[str]:
             return path[:i] # rules.py lives in the parent directory
     return None
 
-def discover_rules(ctx, verbose, output, visited_files, visited_dirs, _active) -> None:
+def discover_rules(ctx, verbose: bool, output: str, visited_files, visited_dirs, _active) -> None:
     if output in _active:
         die(f'ERROR: cycle detected involving {output!r}')
     if output in visited_files:
@@ -441,7 +441,7 @@ def discover_rules(ctx, verbose, output, visited_files, visited_dirs, _active) -
         discover_rules(ctx, verbose, input, visited_files, visited_dirs, _active)
     _active.remove(output)
 
-def propagate_latencies(task, latency) -> None:
+def propagate_latencies(task, latency: int) -> None:
     latency += task.latency
     if latency <= task.priority:
         return # nothing to do -- we are not increasing the priority of this task
