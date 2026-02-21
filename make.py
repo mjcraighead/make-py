@@ -38,6 +38,7 @@ import shutil
 import subprocess
 import sys
 import threading
+from types import MappingProxyType
 from typing import NoReturn, Optional
 
 # Disable creation of __pycache__/.pyc files from rules.py files
@@ -478,7 +479,7 @@ def parse_env_args(args):
         if not k.isidentifier():
             die(f'ERROR: invalid key name for --env: {k!r}')
         env[k] = v
-    return FrozenNamespace(**env)
+    return MappingProxyType(env)
 
 def minimal_env(ctx):
     if ctx.host.os == 'windows': # currently identical to parse_env_args above, but may diverge if more are needed
@@ -505,7 +506,7 @@ def main() -> None:
     parser.add_argument('-c', '--clean', action='store_true', help='clean _out directories first')
     parser.add_argument('-j', '--jobs', action='store', type=int, help='specify the number of parallel jobs (defaults to one per CPU)')
     parser.add_argument('-v', '--verbose', action='store_true', help='print verbose output')
-    parser.add_argument('--env', action='append', default=[], help='set ctx.env.KEY to VALUE in rules.py evaluation environment', metavar='KEY=VALUE')
+    parser.add_argument('--env', action='append', default=[], help="set ctx.env['KEY'] to VALUE in rules.py evaluation environment", metavar='KEY=VALUE')
     parser.add_argument('--inherit-env', action='store_true', help='explicitly inherit full host environment in subprocesses')
     parser.add_argument('outputs', nargs='+', help='outputs to make')
     args = parser.parse_args()

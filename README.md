@@ -46,7 +46,7 @@ but still **small enough to understand**.
   - Sets `SOURCE_DATE_EPOCH=0`, which makes `__DATE__`/`__TIME__` in C/C++ compile reproducibly.
   - On Windows, injects only the minimal set of system variables needed to run toolchains.
   - Can fall back to inherited environment variables with `--inherit-env`.
-- `--env KEY=VALUE` exposes external config to `rules.py` as `ctx.env.KEY`, for per-host or per-distro customization.
+- `--env KEY=VALUE` exposes external config to `rules.py` as `ctx.env['KEY']`, for per-host or per-distro customization.
 
 ### ⚙️ Lightweight by design
 - Entire tool lives in a **single Python file (~600 lines)**.
