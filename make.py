@@ -38,7 +38,7 @@ import shutil
 import subprocess
 import sys
 import threading
-from types import MappingProxyType
+from types import MappingProxyType, SimpleNamespace
 from typing import NoReturn, Optional
 
 # Disable creation of __pycache__/.pyc files from rules.py files
@@ -272,18 +272,6 @@ class Task:
         info = (self.outputs, self.inputs, self.cwd, self.cmd, self.depfile, self.order_only_inputs, self.msvc_show_includes, self.allow_output, self.output_exclude)
         return hashlib.sha256(pickle.dumps(info, protocol=4)).hexdigest() # XXX bump to protocol=5 once we drop 3.6/3.7 support
 
-class FrozenNamespace:
-    __slots__ = ('__dict__',) # allow exactly one slot: the instance dict itself
-    def __init__(self, **kwargs):
-        object.__setattr__(self, '__dict__', dict(kwargs))
-    def __setattr__(self, k, v):
-        raise AttributeError(f'{self.__class__.__name__} is read-only')
-    def __delattr__(self, k):
-        raise AttributeError(f'{self.__class__.__name__} is read-only')
-    def __repr__(self) -> str:
-        items = ', '.join(f'{k}={v!r}' for k, v in self.__dict__.items())
-        return f'{self.__class__.__name__}({items})'
-
 # make.py canonicalized host ABI detection: runs on any plausible system in 2026 with Python 3.6+.
 # ctx.host.os = normalized OS ABI family (kernel/loader/libc), ctx.host.arch = normalized CPU ISA family.
 os_map = {
@@ -301,7 +289,7 @@ def detect_host():
     (system, machine) = (platform.system(), platform.machine())
     if system not in os_map or machine not in arch_map:
         die(f'ERROR: host detection failed: system={system!r} machine={machine!r}')
-    return FrozenNamespace(os=os_map[system], arch=arch_map[machine])
+    return SimpleNamespace(os=os_map[system], arch=arch_map[machine])
 
 class EvalContext:
     __slots__ = ('cwd', 'env', 'host', 'path')
@@ -381,7 +369,6 @@ def validate_rules_py_ast(tree, path: str) -> None:
         if isinstance(node, ast.Constant) and isinstance(node.value, (bytes, complex, float)): # note: small loophole on 3.6/3.7, which uses ast.Bytes/Num instead
             expect(False, path, node.lineno, f'{type(node.value).__name__} literal not allowed')
 
-CTX_FIELDS = ('host', 'env', 'path', 'rule', 'cwd')
 SAFE_BUILTINS = (
     'len', 'range', 'print', 'repr', # essentials and debugging
     'enumerate', 'zip', 'sorted', 'reversed', # common iteration helpers
@@ -410,8 +397,7 @@ def eval_rules_py(ctx, verbose: bool, pathname: str, index: int) -> None:
         with contextlib.suppress(FileNotFoundError):
             make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in open(f'{dirname}/_out/.make.db'))
     ctx.cwd = dirname
-    frozen_ctx = FrozenNamespace(**{k: getattr(ctx, k) for k in CTX_FIELDS})
-    rules_py_module.rules(frozen_ctx)
+    rules_py_module.rules(ctx)
 
 def locate_rules_py_dir(path: str) -> Optional[str]:
     for pattern in ('/_out/', '/:'): # look for standard and phony rules
@@ -521,7 +507,7 @@ def main() -> None:
     ctx = EvalContext()
     ctx.host = detect_host()
     ctx.env = parse_env_args(args.env)
-    ctx.path = FrozenNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow tasks to access ~
+    ctx.path = SimpleNamespace(expanduser=os.path.expanduser) # XXX temporary hole permitted in our sandbox to allow tasks to access ~
     global default_subprocess_env
     default_subprocess_env = os.environ.copy() if args.inherit_env else minimal_env(ctx) # use hermetic environment unless overridden by --inherit-env
     (visited_files, visited_dirs) = (set(), set())
