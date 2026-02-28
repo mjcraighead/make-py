@@ -39,7 +39,7 @@ import subprocess
 import sys
 import threading
 from types import MappingProxyType, SimpleNamespace
-from typing import NoReturn, Optional
+from typing import Dict, NoReturn, Optional
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
@@ -429,7 +429,7 @@ def discover_rules(ctx: EvalContext, verbose: bool, output: str, visited_files, 
         discover_rules(ctx, verbose, input, visited_files, visited_dirs, _active)
     _active.remove(output)
 
-def propagate_latencies(task, latency: int) -> None:
+def propagate_latencies(task: Task, latency: int) -> None:
     latency += task.latency
     if latency <= task.priority:
         return # nothing to do -- we are not increasing the priority of this task
@@ -468,7 +468,7 @@ def parse_env_args(args):
         env[k] = v
     return MappingProxyType(env)
 
-def minimal_env(ctx: EvalContext):
+def minimal_env(ctx: EvalContext) -> Dict[str, str]:
     if ctx.host.os == 'windows': # currently identical to parse_env_args above, but may diverge if more are needed
         keys = ('ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
                 'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE')
