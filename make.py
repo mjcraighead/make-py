@@ -285,7 +285,7 @@ arch_map = {
     'ARM64': 'aarch64', 'aarch64': 'aarch64', 'arm64': 'aarch64',
     'ppc64le': 'ppc64le', 'riscv64': 'riscv64', 's390x': 's390x',
 }
-def detect_host():
+def detect_host() -> SimpleNamespace:
     (system, machine) = (platform.system(), platform.machine())
     if system not in os_map or machine not in arch_map:
         die(f'ERROR: host detection failed: system={system!r} machine={machine!r}')
@@ -377,7 +377,7 @@ SAFE_BUILTINS = (
 )
 safe_builtins = {name: getattr(builtins, name) for name in SAFE_BUILTINS}
 
-def eval_rules_py(ctx, verbose: bool, pathname: str, index: int) -> None:
+def eval_rules_py(ctx: EvalContext, verbose: bool, pathname: str, index: int) -> None:
     if verbose:
         print(f'Parsing {pathname!r}...')
     source = open(pathname, encoding='utf-8').read()
@@ -406,7 +406,7 @@ def locate_rules_py_dir(path: str) -> Optional[str]:
             return path[:i] # rules.py lives in the parent directory
     return None
 
-def discover_rules(ctx, verbose: bool, output: str, visited_files, visited_dirs, _active) -> None:
+def discover_rules(ctx: EvalContext, verbose: bool, output: str, visited_files, visited_dirs, _active) -> None:
     if output in _active:
         die(f'ERROR: cycle detected involving {output!r}')
     if output in visited_files:
@@ -468,7 +468,7 @@ def parse_env_args(args):
         env[k] = v
     return MappingProxyType(env)
 
-def minimal_env(ctx):
+def minimal_env(ctx: EvalContext):
     if ctx.host.os == 'windows': # currently identical to parse_env_args above, but may diverge if more are needed
         keys = ('ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
                 'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE')
