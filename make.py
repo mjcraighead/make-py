@@ -170,7 +170,7 @@ class WorkerThread(threading.Thread):
 
 # Note: external orchestrators may predeclare certain outputs as hermetically clean.
 # make.py treats such declarations as axiomatic -- they come from elsewhere.
-def schedule(output: str, visited, enqueued, completed) -> None:
+def schedule(output: str, visited: set, enqueued: set, completed: set) -> None:
     if output in visited or output in completed:
         return
     task = tasks[output]
@@ -406,7 +406,7 @@ def locate_rules_py_dir(path: str) -> Optional[str]:
             return path[:i] # rules.py lives in the parent directory
     return None
 
-def discover_rules(ctx: EvalContext, verbose: bool, output: str, visited_files, visited_dirs, _active) -> None:
+def discover_rules(ctx: EvalContext, verbose: bool, output: str, visited_files: set, visited_dirs: set, _active: set) -> None:
     if output in _active:
         die(f'ERROR: cycle detected involving {output!r}')
     if output in visited_files:
