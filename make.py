@@ -39,7 +39,7 @@ import subprocess
 import sys
 import threading
 from types import MappingProxyType, SimpleNamespace
-from typing import Dict, NoReturn, Optional
+from typing import Dict, NoReturn, Optional, Set
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
@@ -170,7 +170,7 @@ class WorkerThread(threading.Thread):
 
 # Note: external orchestrators may predeclare certain outputs as hermetically clean.
 # make.py treats such declarations as axiomatic -- they come from elsewhere.
-def schedule(output: str, visited: set, enqueued: set, completed: set) -> None:
+def schedule(output: str, visited: Set[str], enqueued: Set['Task'], completed: Set[str]) -> None:
     if output in visited or output in completed:
         return
     task = tasks[output]
@@ -406,7 +406,7 @@ def locate_rules_py_dir(path: str) -> Optional[str]:
             return path[:i] # rules.py lives in the parent directory
     return None
 
-def discover_rules(ctx: EvalContext, verbose: bool, output: str, visited_files: set, visited_dirs: set, _active: set) -> None:
+def discover_rules(ctx: EvalContext, verbose: bool, output: str, visited_files: Set[str], visited_dirs: Set[str], _active: Set[str]) -> None:
     if output in _active:
         die(f'ERROR: cycle detected involving {output!r}')
     if output in visited_files:
