@@ -87,7 +87,7 @@ else:
     def joinpath(cwd: str, path: str) -> str:
         return path if path[0] == '/' else f'{cwd}/{path}'
 
-def execute(task, verbose: bool) -> None:
+def execute(task: 'Task', verbose: bool) -> None:
     """Run task command, capture/filter its output, update bookkeeping, and log to event_queue."""
     # Output file existence is not checked here; missing outputs are detected in schedule() when they are consumed as inputs.
     try:
@@ -452,14 +452,14 @@ def drain_event_queue():
         except queue.Empty:
             break
 
-def parse_env_args(args):
+def parse_env_args(env_args: list) -> MappingProxyType:
     if os.name == 'nt': # Windows: inject the smallest viable subset of os.environ needed to execute system tools
         keys = ('ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
                 'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE')
         env = {k: os.environ[k] for k in keys if k in os.environ}
     else:
         env = {} # POSIX: no injection; hermetic by default
-    for arg in args:
+    for arg in env_args:
         if '=' not in arg:
             die(f'ERROR: invalid --env format (expected key=value): {arg!r}')
         (k, v) = arg.split('=', 1)
