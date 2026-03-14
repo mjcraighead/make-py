@@ -44,7 +44,7 @@ from typing import Dict, NoReturn, Optional, Set
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
 
-tasks = {}
+tasks: Dict[str, 'Task'] = {}
 make_db = {}
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
