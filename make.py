@@ -39,7 +39,7 @@ import subprocess
 import sys
 import threading
 from types import MappingProxyType, SimpleNamespace
-from typing import Dict, NoReturn, Optional, Set
+from typing import Dict, List, NoReturn, Optional, Set
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
@@ -452,7 +452,7 @@ def drain_event_queue():
         except queue.Empty:
             break
 
-def parse_env_args(env_args: list) -> MappingProxyType:
+def parse_env_args(env_args: List[str]) -> MappingProxyType:
     if os.name == 'nt': # Windows: inject the smallest viable subset of os.environ needed to execute system tools
         keys = ('ProgramFiles', 'ProgramFiles(x86)', 'CommonProgramFiles', 'CommonProgramFiles(x86)', 'SystemRoot', 'ComSpec',
                 'TEMP', 'TMP', 'PATH', 'NUMBER_OF_PROCESSORS', 'PROCESSOR_ARCHITECTURE')
