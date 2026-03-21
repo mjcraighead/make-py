@@ -39,7 +39,7 @@ import subprocess
 import sys
 import threading
 from types import MappingProxyType, SimpleNamespace
-from typing import Dict, List, NoReturn, Optional, Set
+from typing import Any, Dict, Iterator, List, NoReturn, Optional, Set, Tuple
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
@@ -438,7 +438,7 @@ def propagate_latencies(task: Task, latency: int) -> None:
         if input in tasks:
             propagate_latencies(tasks[input], latency)
 
-def drain_event_queue():
+def drain_event_queue() -> Iterator[Tuple[str, Any]]:
     """Drain and yield all pending event_queue entries; blocks until at least one is available."""
     while True:
         try:
