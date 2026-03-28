@@ -116,7 +116,7 @@ def execute(task: 'Task', verbose: bool) -> None:
         # Write a make-style depfile listing all included headers
         tmp_path = f'{task.depfile}.tmp'
         parts = [f'{task.outputs[0]}:', *sorted(inputs)] # we checked for only 1 output at task declaration time
-        with open(tmp_path, 'w') as f:
+        with open(tmp_path, 'w', encoding='utf-8') as f:
             f.write(' \\\n  '.join(parts) + '\n') # add line continuations and indentation
         os.replace(tmp_path, task.depfile)
     elif task.output_exclude:
@@ -398,7 +398,7 @@ def eval_rules_py(ctx: EvalContext, verbose: bool, pathname: str, index: int) ->
     if dirname not in make_db:
         make_db[dirname] = {}
         with contextlib.suppress(FileNotFoundError):
-            with open(f'{dirname}/_out/.make.db') as f:
+            with open(f'{dirname}/_out/.make.db', encoding='utf-8') as f:
                 make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in f)
     ctx.cwd = dirname
     rules_py_module.rules(ctx)
@@ -602,7 +602,7 @@ def main() -> None:
                 with contextlib.suppress(FileExistsError):
                     os.mkdir(f'{cwd}/_out')
                 tmp_path = f'{cwd}/_out/.make.db.tmp'
-                with open(tmp_path, 'w') as f:
+                with open(tmp_path, 'w', encoding='utf-8') as f:
                     f.write(''.join(f'{output} {signature}\n' for (output, signature) in db.items()))
                 os.replace(tmp_path, f'{cwd}/_out/.make.db')
             else:
