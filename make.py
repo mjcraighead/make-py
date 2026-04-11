@@ -39,13 +39,13 @@ import subprocess
 import sys
 import threading
 from types import MappingProxyType, SimpleNamespace
-from typing import Any, Dict, Iterator, List, NoReturn, Optional, Set, Tuple
+from typing import Any, Dict, Iterator, List, NoReturn, Optional, Set, Tuple, cast
 
 # Disable creation of __pycache__/.pyc files from rules.py files
 sys.dont_write_bytecode = True
 
 tasks: Dict[str, 'Task'] = {}
-make_db = {}
+make_db: Dict[str, Dict[str, Optional[str]]] = {}
 task_queue = queue.PriorityQueue()
 event_queue = queue.Queue()
 priority_queue_counter = itertools.count() # tiebreaker counter to fall back to FIFO when task priorities are the same
@@ -399,7 +399,7 @@ def eval_rules_py(ctx: EvalContext, verbose: bool, pathname: str, index: int) ->
         make_db[dirname] = {}
         with contextlib.suppress(FileNotFoundError):
             with open(f'{dirname}/_out/.make.db', encoding='utf-8') as f:
-                make_db[dirname] = dict(line.rstrip().rsplit(' ', 1) for line in f)
+                make_db[dirname] = cast(Dict[str, Optional[str]], dict(line.rstrip().rsplit(' ', 1) for line in f))
     ctx.cwd = dirname
     rules_py_module.rules(ctx)
 
